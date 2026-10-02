@@ -30,10 +30,14 @@ export const JoinPage = () => {
   }, [session, code]);
 
   const handleJoin = async (joinCode: string, referrerId?: string) => {
-    const partyId = await joinParty(joinCode, referrerId);
-    if (partyId) {
-      addToast('Gruba başarıyla katıldın!', 'success');
-      navigate(`/party/${partyId}`, { replace: true });
+    const result = await joinParty(joinCode, referrerId);
+    if (result) {
+      if (result.alreadyJoined) {
+        addToast('Zaten bu gruptasınız.', 'info');
+      } else {
+        addToast('Gruba başarıyla katıldın!', 'success');
+      }
+      navigate(`/party/${result.partyId}`, { replace: true });
     } else {
       const err = usePartyStore.getState().error;
       addToast(err || 'Grup bulunamadı veya kod geçersiz.', 'error');

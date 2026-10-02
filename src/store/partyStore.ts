@@ -14,7 +14,7 @@ interface PartyState {
   fetchPartyDetails: (partyId: string) => Promise<void>;
   fetchEvents: (partyId: string) => Promise<void>;
   createParty: (name: string) => Promise<string | null>;
-  joinParty: (joinCode: string, referrerId?: string) => Promise<string | null>;
+  joinParty: (joinCode: string, referrerId?: string) => Promise<{ partyId: string; alreadyJoined: boolean } | null>;
   addShadowMember: (partyId: string, displayName: string) => Promise<{ success: boolean; errorMsg?: string }>;
   updateMemberRole: (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => Promise<{ success: boolean; errorMsg?: string }>;
   removeMember: (partyId: string, memberId: string) => Promise<{ success: boolean; errorMsg?: string }>;
@@ -172,7 +172,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
       if (existingMember) {
         await get().fetchParties();
-        return partyId;
+        return { partyId, alreadyJoined: true };
       }
 
       const { error: joinError } = await supabase
@@ -186,6 +186,8 @@ export const usePartyStore = create<PartyState>((set, get) => ({
 
       if (joinError) {
         if (joinError.code !== '23505') throw joinError;
+        await get().fetchParties();
+        return { partyId, alreadyJoined: true };
       } else {
         const { data: newMember } = await supabase.from('party_members').select('id, display_name').eq('party_id', partyId).eq('profile_id', user.id).single();
         if (newMember) {
@@ -212,7 +214,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       }
 
       await get().fetchParties();
-      return partyId;
+      return { partyId, alreadyJoined: false };
     } catch (err: any) {
       set({ error: err.message });
       return null;

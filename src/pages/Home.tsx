@@ -36,12 +36,16 @@ export const Home = () => {
       localStorage.removeItem('pending_join_code');
       if (pendingRef) localStorage.removeItem('pending_join_ref');
       
-      usePartyStore.getState().joinParty(pendingCode, pendingRef || undefined).then((joinedId) => {
-        if (joinedId) {
-          addToast('Davet linki ile gruba katıldınız!', 'success');
-          navigate(`/party/${joinedId}`);
+      usePartyStore.getState().joinParty(pendingCode, pendingRef || undefined).then((result) => {
+        if (result) {
+          if (result.alreadyJoined) {
+            addToast('Zaten bu gruptasınız.', 'info');
+          } else {
+            addToast('Davet linki ile gruba katıldınız!', 'success');
+          }
+          navigate(`/party/${result.partyId}`);
         } else {
-          addToast('Davet linki geçersiz veya gruba zaten üyesiniz.', 'error');
+          addToast('Davet linki geçersiz.', 'error');
         }
       });
     }
@@ -83,17 +87,21 @@ export const Home = () => {
     }
 
     setIsJoining(true);
-    const joinedId = await usePartyStore.getState().joinParty(joinCodeInput.trim());
+    const result = await usePartyStore.getState().joinParty(joinCodeInput.trim());
     setIsJoining(false);
 
     const error = usePartyStore.getState().error;
     if (error) {
       addToast(error, 'error');
-    } else if (joinedId) {
+    } else if (result) {
       setIsJoinModalOpen(false);
       setJoinCodeInput('');
-      addToast('Gruba başarıyla katıldın!', 'success');
-      navigate(`/party/${joinedId}`);
+      if (result.alreadyJoined) {
+        addToast('Zaten bu gruptasınız.', 'info');
+      } else {
+        addToast('Gruba başarıyla katıldın!', 'success');
+      }
+      navigate(`/party/${result.partyId}`);
     }
   };
 
