@@ -40,6 +40,8 @@ const generateUUID = () => {
   });
 };
 
+let activeJoinPromise: Promise<{ partyId: string; alreadyJoined: boolean } | null> | null = null;
+
 export const usePartyStore = create<PartyState>((set, get) => ({
   parties: [],
   currentParty: null,
@@ -158,73 +160,89 @@ export const usePartyStore = create<PartyState>((set, get) => ({
   },
 
   joinParty: async (joinCode: string, referrerId?: string) => {
+    if (activeJoinPromise) {
+      return activeJoinPromise;
+    }
+
     set({ isLoading: true, error: null });
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Giriş yapmanız gerekiyor.');
+    
+    activeJoinPromise = (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Giriş yapmanız gerekiyor.');
 
-      const { data: partyId, error: findError } = await supabase.rpc('get_party_id_by_code', {
-        code: joinCode.toUpperCase()
-      });
+        const { data: partyId, error: findError } = await supabase.rpc('get_party_id_by_code', {
+          code: joinCode.toUpperCase()
+        });
 
-      if (findError || !partyId) throw new Error('Grup bulunamadı veya kod geçersiz.');
+        if (findError || !partyId) throw new Error('Grup bulunamadı veya kod geçersiz.');
 
-      const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
-      if (existingMember) {
-        await get().fetchParties();
-        return { partyId, alreadyJoined: true };
-      }
-
-      // getUser bir kez daha çağır — misafir adını updateUser ile yeni yazmış olabilir,
-      // stale metadata'dan "Üye" yazmasını engelle
-      const { data: { user: freshUser } } = await supabase.auth.getUser();
-      const displayName = freshUser?.user_metadata?.full_name || user.user_metadata?.full_name || 'Üye';
-
-      const { error: joinError } = await supabase
-        .from('party_members')
-        .insert([{
-          party_id: partyId,
-          profile_id: user.id,
-          display_name: displayName,
-          role: 'member'
-        }]);
-
-      if (joinError) {
-        if (joinError.code !== '23505') throw joinError;
-        await get().fetchParties();
-        return { partyId, alreadyJoined: true };
-      } else {
-        const { data: newMember } = await supabase.from('party_members').select('id, display_name').eq('party_id', partyId).eq('profile_id', user.id).single();
-        if (newMember) {
-          const isGuest = user.is_anonymous;
-          let desc = `"${newMember.display_name}" gruba katıldı.`;
-          if (isGuest) {
-            desc = `"${newMember.display_name}" Misafir (Hayalet) olarak gruba katıldı.`;
-          }
-
-          if (referrerId) {
-            const { data: referrer } = await supabase.from('party_members').select('display_name').eq('profile_id', referrerId).eq('party_id', partyId).maybeSingle();
-            if (referrer) {
-              desc += ` (Davet eden: ${referrer.display_name})`;
-            }
-          }
-
-          await supabase.from('party_events').insert([{
-            party_id: partyId,
-            actor_id: newMember.id,
-            event_type: 'member_joined',
-            description: desc
-          }]);
+        const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
+        if (existingMember) {
+          await get().fetchParties();
+          return { partyId, alreadyJoined: true };
         }
-      }
 
-      await get().fetchParties();
-      return { partyId, alreadyJoined: false };
-    } catch (err: any) {
-      set({ error: err.message });
-      return null;
+        // getUser bir kez daha çağır — misafir adını updateUser ile yeni yazmış olabilir,
+        // stale metadata'dan "Üye" yazmasını engelle
+        const { data: { user: freshUser } } = await supabase.auth.getUser();
+        const displayName = freshUser?.user_metadata?.full_name || user.user_metadata?.full_name || 'Üye';
+
+        const { error: joinError } = await supabase
+          .from('party_members')
+          .insert([{
+            party_id: partyId,
+            profile_id: user.id,
+            display_name: displayName,
+            role: 'member'
+          }]);
+
+        if (joinError) {
+          if (joinError.code !== '23505') throw joinError;
+          await get().fetchParties();
+          return { partyId, alreadyJoined: true };
+        } else {
+          // Because React 18 strict mode might have bypassed the client check due to concurrency,
+          // And we don't have a UNIQUE constraint on profile_id+party_id,
+          // Let's use `.order('created_at').limit(1).single()` just to be safe.
+          const { data: newMember } = await supabase.from('party_members').select('id, display_name').eq('party_id', partyId).eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).single();
+          if (newMember) {
+            const isGuest = user.is_anonymous;
+            let desc = `"${newMember.display_name}" gruba katıldı.`;
+            if (isGuest) {
+              desc = `"${newMember.display_name}" Misafir (Hayalet) olarak gruba katıldı.`;
+            }
+
+            if (referrerId) {
+              const { data: referrer } = await supabase.from('party_members').select('display_name').eq('profile_id', referrerId).eq('party_id', partyId).maybeSingle();
+              if (referrer) {
+                desc += ` (Davet eden: ${referrer.display_name})`;
+              }
+            }
+
+            await supabase.from('party_events').insert([{
+              party_id: partyId,
+              actor_id: newMember.id,
+              event_type: 'member_joined',
+              description: desc
+            }]);
+          }
+        }
+
+        await get().fetchParties();
+        return { partyId, alreadyJoined: false };
+      } catch (err: any) {
+        set({ error: err.message });
+        return null;
+      } finally {
+        set({ isLoading: false });
+      }
+    })();
+
+    try {
+      return await activeJoinPromise;
     } finally {
-      set({ isLoading: false });
+      activeJoinPromise = null;
     }
   },
 
@@ -233,6 +251,9 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Giriş yapmanız gerekiyor.");
+
+      const { data: party } = await supabase.from('parties').select('is_archived').eq('id', partyId).single();
+      if (party?.is_archived) throw new Error("Arşivlenmiş gruba üye eklenemez.");
 
       const { error } = await supabase
         .from('party_members')
