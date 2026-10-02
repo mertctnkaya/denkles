@@ -38,7 +38,6 @@ export const Home = () => {
       
       usePartyStore.getState().joinParty(pendingCode, pendingRef || undefined).then((result) => {
         if (result) {
-          if (result.ignored) return;
           if (result.alreadyJoined) {
             addToast('Zaten bu gruptasınız.', 'info');
           } else {
@@ -97,7 +96,6 @@ export const Home = () => {
     } else if (result) {
       setIsJoinModalOpen(false);
       setJoinCodeInput('');
-      if (result.ignored) return;
       if (result.alreadyJoined) {
         addToast('Zaten bu gruptasınız.', 'info');
       } else {

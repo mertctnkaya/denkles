@@ -32,7 +32,6 @@ export const JoinPage = () => {
   const handleJoin = async (joinCode: string, referrerId?: string) => {
     const result = await joinParty(joinCode, referrerId);
     if (result) {
-      if (result.ignored) return; // Zaten bir join işlemi yürütülüyor, toast atma
       if (result.alreadyJoined) {
         addToast('Zaten bu gruptasınız.', 'info');
       } else {
@@ -62,7 +61,10 @@ export const JoinPage = () => {
       });
       
       // 3. Direkt katıl (useEffect'e bırakmak yerine burada çağır — çoklu toast'u önler)
-      await handleJoin(code, refId);
+      // DİKKAT: Burada handleJoin çağırmıyoruz! Çünkü signInAnonymously sonrası
+      // oturum açıldığı için App.tsx bizi yeni bir (authenticated) JoinPage'e yönlendiriyor.
+      // O yeni JoinPage'in useEffect'i zaten handleJoin'i çağıracak. 
+      // Eski unmounted componentten çağırmak router'ı ve navigate'i kilitliyor.
     } catch (err: any) {
       hasAttemptedJoin.current = false;
       addToast(err.message || 'Misafir girişi başarısız oldu.', 'error');
