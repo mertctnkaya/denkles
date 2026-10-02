@@ -28,27 +28,25 @@ export const PartySettingsModal = ({ isOpen, onClose, party, myMember, netBalanc
   const handleUpdateName = async () => {
     if (!partyName.trim() || partyName === party.name) return;
     setIsUpdating(true);
-    const success = await updateParty(party.id, { name: partyName.trim() });
+    const result = await updateParty(party.id, { name: partyName.trim() });
     setIsUpdating(false);
 
-    if (success) {
+    if (result.success) {
       addToast('Grup adı güncellendi.', 'success');
     } else {
-      const err = usePartyStore.getState().error;
-      addToast(err || 'Güncellenirken hata oluştu.', 'error');
+      addToast(result.errorMsg || 'Güncellenirken hata oluştu.', 'error');
     }
   };
 
   const handleToggleArchive = async () => {
     setIsUpdating(true);
-    const success = await updateParty(party.id, { is_archived: !party.is_archived }, myMember.id);
+    const result = await updateParty(party.id, { is_archived: !party.is_archived }, myMember.id);
     setIsUpdating(false);
 
-    if (success) {
+    if (result.success) {
       addToast(party.is_archived ? 'Grup arşivden çıkarıldı.' : 'Grup arşivlendi.', 'success');
     } else {
-      const err = usePartyStore.getState().error;
-      addToast(err || 'İşlem başarısız.', 'error');
+      addToast(result.errorMsg || 'İşlem başarısız.', 'error');
     }
   };
 

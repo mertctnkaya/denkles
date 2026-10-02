@@ -15,10 +15,10 @@ interface PartyState {
   fetchEvents: (partyId: string) => Promise<void>;
   createParty: (name: string) => Promise<string | null>;
   joinParty: (joinCode: string) => Promise<string | null>;
-  addShadowMember: (partyId: string, displayName: string) => Promise<void>;
-  updateMemberRole: (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => Promise<void>;
-  removeMember: (partyId: string, memberId: string) => Promise<void>;
-  updateParty: (partyId: string, updates: Partial<Party>, actorId?: string) => Promise<boolean>;
+  addShadowMember: (partyId: string, displayName: string) => Promise<{ success: boolean; errorMsg?: string }>;
+  updateMemberRole: (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => Promise<{ success: boolean; errorMsg?: string }>;
+  removeMember: (partyId: string, memberId: string) => Promise<{ success: boolean; errorMsg?: string }>;
+  updateParty: (partyId: string, updates: Partial<Party>, actorId?: string) => Promise<{ success: boolean; errorMsg?: string }>;
   deleteParty: (partyId: string) => Promise<{ success: boolean; errorMsg?: string }>;
   leaveParty: (partyId: string, memberId: string) => Promise<{ success: boolean; errorMsg?: string }>;
 }
@@ -237,8 +237,10 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       }
 
       await get().fetchPartyDetails(partyId);
+      await get().fetchEvents(partyId);
+      return { success: true };
     } catch (err: any) {
-      set({ error: err.message });
+      return { success: false, errorMsg: err.message };
     } finally {
       set({ isLoading: false });
     }
@@ -285,8 +287,10 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       }
 
       await get().fetchPartyDetails(partyId);
+      await get().fetchEvents(partyId);
+      return { success: true };
     } catch (err: any) {
-      set({ error: err.message });
+      return { success: false, errorMsg: err.message };
     } finally {
       set({ isLoading: false });
     }
@@ -383,9 +387,11 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       }
 
       await get().fetchPartyDetails(partyId);
+      await get().fetchEvents(partyId);
+      return { success: true };
     } catch (err: any) {
-      set({ error: err.message });
       console.error("Remove Member Error:", err);
+      return { success: false, errorMsg: err.message };
     } finally {
       set({ isLoading: false });
     }
@@ -412,10 +418,9 @@ export const usePartyStore = create<PartyState>((set, get) => ({
 
       await get().fetchPartyDetails(partyId);
       await get().fetchEvents(partyId);
-      return true;
+      return { success: true };
     } catch (err: any) {
-      set({ error: err.message });
-      return false;
+      return { success: false, errorMsg: err.message };
     } finally {
       set({ isLoading: false });
     }
@@ -501,3 +506,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     }
   }
 }));
+
+
+
+

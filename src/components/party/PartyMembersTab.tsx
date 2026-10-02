@@ -40,17 +40,26 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
   const handleAddGhost = async () => {
     if (!ghostName.trim()) return;
     setIsAddingGhost(true);
-    await addShadowMember(party.id, ghostName.trim());
+    const result = await addShadowMember(party.id, ghostName.trim());
     setIsAddingGhost(false);
-    setIsAddGhostModalOpen(false);
-    setGhostName('');
-    addToast('Hayalet üye eklendi.', 'success');
+    
+    if (result.success) {
+      setIsAddGhostModalOpen(false);
+      setGhostName('');
+      addToast('Hayalet üye eklendi.', 'success');
+    } else {
+      addToast(result.errorMsg || 'Hayalet üye eklenirken hata oluştu.', 'error');
+    }
   };
 
   const handleRoleChange = async (memberId: string, newRole: 'owner' | 'admin' | 'member') => {
     if (!canManageRoles) return;
-    await updateMemberRole(party.id, memberId, newRole);
-    addToast('Rol güncellendi.', 'success');
+    const result = await updateMemberRole(party.id, memberId, newRole);
+    if (result.success) {
+      addToast('Rol güncellendi.', 'success');
+    } else {
+      addToast(result.errorMsg || 'Rol güncellenirken hata oluştu.', 'error');
+    }
   };
 
   const openDeleteModal = (memberId: string, name: string) => {
@@ -66,11 +75,10 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
   const confirmRemove = async () => {
     if (!canManageMembers || !memberToDelete) return;
     
-    await removeMember(party.id, memberToDelete.id);
-    const error = usePartyStore.getState().error;
+    const result = await removeMember(party.id, memberToDelete.id);
     
-    if (error) {
-      addToast(`Hata: ${error}`, 'error');
+    if (!result.success) {
+      addToast(result.errorMsg || 'Hata oluştu.', 'error');
     } else {
       await fetchShares(party.id);
       addToast('Kişi başarıyla çıkarıldı.', 'success');
@@ -83,11 +91,15 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
   const confirmTransfer = async () => {
     if (!canManageRoles || !memberToTransfer) return;
     
-    await updateMemberRole(party.id, memberToTransfer.id, 'owner');
-    addToast('Kuruculuk başarıyla devredildi.', 'success');
+    const result = await updateMemberRole(party.id, memberToTransfer.id, 'owner');
     
-    setIsTransferModalOpen(false);
-    setMemberToTransfer(null);
+    if (result.success) {
+      addToast('Kuruculuk başarıyla devredildi.', 'success');
+      setIsTransferModalOpen(false);
+      setMemberToTransfer(null);
+    } else {
+      addToast(result.errorMsg || 'Kuruculuk devredilirken hata oluştu.', 'error');
+    }
   };
 
   return (
