@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../services/supabase';
+import { usePartyStore } from './partyStore';
 import type { Share, ShareParticipant, Settlement } from '../types/database';
 import { calculateOwedAmounts } from '../core/splittingEngine';
 import type { SplitInput } from '../core/splittingEngine';
@@ -168,6 +169,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
 
       // Verileri yenile
       await get().fetchShares(partyId);
+      usePartyStore.getState().fetchEvents(partyId);
       return true;
     } catch (err: any) {
       set({ error: err.message });
@@ -213,6 +215,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
       }
 
       await get().fetchShares(partyId);
+      usePartyStore.getState().fetchEvents(partyId);
       return true;
     } catch (err: any) {
       set({ error: err.message });
@@ -254,6 +257,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
       }
 
       await get().fetchShares(partyId);
+      usePartyStore.getState().fetchEvents(partyId);
       return true;
     } catch (err: any) {
       set({ error: err.message });

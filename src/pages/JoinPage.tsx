@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useAuthStore } from '../store/authStore';
 import { usePartyStore } from '../store/partyStore';
@@ -9,6 +9,8 @@ import { Icon } from '../components/shared/Icon';
 
 export const JoinPage = () => {
   const { code } = useParams<{ code: string }>();
+  const [searchParams] = useSearchParams();
+  const refId = searchParams.get('ref') || undefined;
   const navigate = useNavigate();
   const { session } = useAuthStore();
   const { joinParty } = usePartyStore();
@@ -17,18 +19,18 @@ export const JoinPage = () => {
   const [guestName, setGuestName] = useState('');
   const [isAnonymousLoading, setIsAnonymousLoading] = useState(false);
   const [showGuestInput, setShowGuestInput] = useState(false);
-  const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
+  const hasAttemptedJoin = useRef(false);
 
   useEffect(() => {
     // Oturum varsa direkt katıl ve yönlendir
-    if (session && code && !hasAttemptedJoin) {
-      setHasAttemptedJoin(true);
-      handleJoin(code);
+    if (session && code && !hasAttemptedJoin.current) {
+      hasAttemptedJoin.current = true;
+      handleJoin(code, refId);
     }
-  }, [session, code, hasAttemptedJoin]);
+  }, [session, code]);
 
-  const handleJoin = async (joinCode: string) => {
-    const partyId = await joinParty(joinCode);
+  const handleJoin = async (joinCode: string, referrerId?: string) => {
+    const partyId = await joinParty(joinCode, referrerId);
     if (partyId) {
       addToast('Gruba başarıyla katıldın!', 'success');
       navigate(`/party/${partyId}`, { replace: true });
@@ -63,6 +65,9 @@ export const JoinPage = () => {
   const handleAuthRedirect = () => {
     if (code) {
       localStorage.setItem('pending_join_code', code);
+      if (refId) {
+        localStorage.setItem('pending_join_ref', refId);
+      }
     }
     navigate('/auth');
   };

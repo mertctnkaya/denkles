@@ -47,12 +47,12 @@ export const PartyDetail = () => {
     }
   }, [id, fetchPartyDetails, fetchShares, fetchEvents]);
 
-  // Refresh events when shares or members change (due to actions like addShare, settleDebt, removeMember)
+  // Refresh events when shares or members change (due to actions like addShare, settleDebt, removeMember, changeRole, editShare)
   useEffect(() => {
     if (id) {
       fetchEvents(id);
     }
-  }, [id, shares.length, members.length, fetchEvents]);
+  }, [id, shares, members, fetchEvents]);
 
   const handleAddShare = async (
     title: string,
@@ -156,14 +156,11 @@ export const PartyDetail = () => {
 
   // 2. Durum: Yüklendi ama parti yok, hata var veya kullanıcı bu grupta değil
   if (error || !currentParty || !myMember) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center p-6 pt-24 text-center">
-        <Icon name="error" size={64} className="text-danger mb-4" />
-        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-2">Grup Bulunamadı</h2>
-        <p className="text-slate-500 mb-8 max-w-sm">{error || "Aradığınız grup silinmiş, yetkiniz kaldırılmış veya yanlış bir bağlantıya tıkladınız."}</p>
-        <Button onClick={() => navigate('/')} variant="outline" className="px-8 py-3">Ana Sayfaya Dön</Button>
-      </div>
-    );
+    setTimeout(() => {
+      addToast(error || 'Grup bulunamadı veya yetkiniz yok.', 'error');
+      navigate('/', { replace: true });
+    }, 0);
+    return null;
   }
 
   const performDeleteParty = async () => {

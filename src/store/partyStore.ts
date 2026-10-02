@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { Party, PartyMember } from '../types/database';
 
@@ -14,7 +14,7 @@ interface PartyState {
   fetchPartyDetails: (partyId: string) => Promise<void>;
   fetchEvents: (partyId: string) => Promise<void>;
   createParty: (name: string) => Promise<string | null>;
-  joinParty: (joinCode: string) => Promise<string | null>;
+  joinParty: (joinCode: string, referrerId?: string) => Promise<string | null>;
   addShadowMember: (partyId: string, displayName: string) => Promise<{ success: boolean; errorMsg?: string }>;
   updateMemberRole: (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => Promise<{ success: boolean; errorMsg?: string }>;
   removeMember: (partyId: string, memberId: string) => Promise<{ success: boolean; errorMsg?: string }>;
@@ -157,21 +157,18 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     }
   },
 
-  joinParty: async (joinCode: string) => {
+  joinParty: async (joinCode: string, referrerId?: string) => {
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Giriş yapmanız gerekiyor.");
+      if (!user) throw new Error('Giriş yapmanız gerekiyor.');
 
-      // Partiyi koddan bul
-      // Partiyi koddan bul (RLS engeline takılmamak için RPC kullanıyoruz)
       const { data: partyId, error: findError } = await supabase.rpc('get_party_id_by_code', {
         code: joinCode.toUpperCase()
       });
 
-      if (findError || !partyId) throw new Error("Grup bulunamadı veya kod geçersiz.");
+      if (findError || !partyId) throw new Error('Grup bulunamadı veya kod geçersiz.');
 
-      // Üye olarak ekle (RLS engellememeli, policy'yi hatırlayalım)
       const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
       if (existingMember) {
         await get().fetchParties();
@@ -188,17 +185,28 @@ export const usePartyStore = create<PartyState>((set, get) => ({
         }]);
 
       if (joinError) {
-        // Zaten üyeyse ignore edebiliriz (Supabase unique constraint vs varsa)
-        if (joinError.code !== '23505') throw joinError; // 23505: unique violation
+        if (joinError.code !== '23505') throw joinError;
       } else {
-        // Yeni üye başarıyla katıldıysa log at
         const { data: newMember } = await supabase.from('party_members').select('id, display_name').eq('party_id', partyId).eq('profile_id', user.id).single();
         if (newMember) {
+          const isGuest = user.is_anonymous;
+          let desc = `"${newMember.display_name}" gruba katıldı.`;
+          if (isGuest) {
+            desc = `"${newMember.display_name}" Misafir (Hayalet) olarak gruba katıldı.`;
+          }
+
+          if (referrerId) {
+            const { data: referrer } = await supabase.from('party_members').select('display_name').eq('id', referrerId).maybeSingle();
+            if (referrer) {
+              desc += ` (Davet eden: ${referrer.display_name})`;
+            }
+          }
+
           await supabase.from('party_events').insert([{
             party_id: partyId,
             actor_id: newMember.id,
             event_type: 'member_joined',
-            description: `"${newMember.display_name}" gruba katıldı.`
+            description: desc
           }]);
         }
       }

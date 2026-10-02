@@ -30,9 +30,13 @@ export const Home = () => {
 
     // Davet linkinden geldiyse, login olduktan sonra otomatik katil
     const pendingCode = localStorage.getItem('pending_join_code');
+    const pendingRef = localStorage.getItem('pending_join_ref');
+    
     if (pendingCode) {
       localStorage.removeItem('pending_join_code');
-      usePartyStore.getState().joinParty(pendingCode).then((joinedId) => {
+      if (pendingRef) localStorage.removeItem('pending_join_ref');
+      
+      usePartyStore.getState().joinParty(pendingCode, pendingRef || undefined).then((joinedId) => {
         if (joinedId) {
           addToast('Davet linki ile gruba katıldınız!', 'success');
           navigate(`/party/${joinedId}`);
