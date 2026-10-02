@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { supabase } from '../services/supabase';
 import type { Party, PartyMember } from '../types/database';
 
@@ -172,6 +172,12 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       if (findError || !partyId) throw new Error("Grup bulunamadı veya kod geçersiz.");
 
       // Üye olarak ekle (RLS engellememeli, policy'yi hatırlayalım)
+      const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
+      if (existingMember) {
+        await get().fetchParties();
+        return partyId;
+      }
+
       const { error: joinError } = await supabase
         .from('party_members')
         .insert([{
@@ -506,6 +512,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     }
   }
 }));
+
 
 
 

@@ -213,18 +213,18 @@ export const Home = () => {
                       <Icon name="archive" size={14} className="text-slate-400 shrink-0" title="Arşivlendi" />
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-2">
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
                         navigator.clipboard.writeText(party.join_code);
                         addToast('Davet kodu kopyalandı!', 'success');
                       }}
-                      className="inline-flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-1 rounded-md transition-colors"
+                      className="inline-flex items-center gap-1 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-1 rounded-md transition-colors"
                       title="Kodu kopyala"
                     >
-                      <span className="text-xs font-bold tracking-wider">{party.join_code}</span>
-                      <Icon name="copy" size={12} />
+                      <Icon name="copy" size={10} />
+                      <span className="text-[10px] font-bold tracking-wider">{party.join_code}</span>
                     </div>
                     <div
                       onClick={(e) => {
@@ -233,10 +233,11 @@ export const Home = () => {
                         navigator.clipboard.writeText(inviteLink);
                         addToast('Davet linki kopyalandı!', 'success');
                       }}
-                      className="inline-flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 w-6 h-6 rounded-md transition-colors"
+                      className="inline-flex items-center gap-1 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 px-2 py-1 rounded-md transition-colors"
                       title="Davet linkini kopyala"
                     >
-                      <Icon name="link" size={12} />
+                      <Icon name="link" size={10} />
+                      <span className="text-[10px] font-bold">Davet Linki</span>
                     </div>
                   </div>
                 </div>

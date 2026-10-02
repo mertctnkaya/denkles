@@ -17,13 +17,15 @@ export const JoinPage = () => {
   const [guestName, setGuestName] = useState('');
   const [isAnonymousLoading, setIsAnonymousLoading] = useState(false);
   const [showGuestInput, setShowGuestInput] = useState(false);
+  const [hasAttemptedJoin, setHasAttemptedJoin] = useState(false);
 
   useEffect(() => {
     // Oturum varsa direkt katıl ve yönlendir
-    if (session && code) {
+    if (session && code && !hasAttemptedJoin) {
+      setHasAttemptedJoin(true);
       handleJoin(code);
     }
-  }, [session, code]);
+  }, [session, code, hasAttemptedJoin]);
 
   const handleJoin = async (joinCode: string) => {
     const partyId = await joinParty(joinCode);

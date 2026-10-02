@@ -209,30 +209,31 @@ export const PartyDetail = () => {
             <h1 className="text-lg font-bold text-slate-900 dark:text-white leading-tight">
               {currentParty.name}
             </h1>
-            <div className="flex items-center gap-1.5 mt-0.5">
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
               <div
                 onClick={() => {
                   navigator.clipboard.writeText(currentParty.join_code);
                   addToast('Davet kodu kopyalandı!', 'success');
                 }}
-                className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-0.5 rounded-md cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-1 rounded-md cursor-pointer transition-colors"
                 title="Kodu kopyala"
               >
+                <Icon name="copy" size={12} />
                 <span className="text-xs font-bold tracking-wider">{currentParty.join_code}</span>
-                <Icon name="copy" size={10} />
               </div>
               <div
                 onClick={() => {
-                  const inviteLink = `${window.location.origin}/join/${currentParty.join_code}`;
+                  const inviteLink = `${window.location.origin}/join/${currentParty.join_code}?ref=${myMember.id}`;
                   navigator.clipboard.writeText(inviteLink);
                   addToast('Davet linki kopyalandı!', 'success');
                 }}
-                className="flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 w-5 h-5 rounded-md cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 px-2 py-1 rounded-md cursor-pointer transition-colors"
                 title="Davet linkini kopyala"
               >
-                <Icon name="link" size={10} />
+                <Icon name="link" size={12} />
+                <span className="text-xs font-bold">Davet Linki</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">
+              <span className="text-[10px] text-slate-400 font-medium ml-1">
                 {new Date(currentParty.created_at).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
             </div>
