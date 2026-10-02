@@ -9,12 +9,13 @@ interface PartyState {
   events: any[];
   isLoading: boolean;
   error: string | null;
+  isJoiningParty: boolean;
 
   fetchParties: () => Promise<void>;
   fetchPartyDetails: (partyId: string) => Promise<void>;
   fetchEvents: (partyId: string) => Promise<void>;
   createParty: (name: string) => Promise<string | null>;
-  joinParty: (joinCode: string, referrerId?: string) => Promise<{ partyId: string; alreadyJoined: boolean } | null>;
+  joinParty: (joinCode: string, referrerId?: string) => Promise<{ partyId: string; alreadyJoined: boolean; ignored?: boolean } | null>;
   addShadowMember: (partyId: string, displayName: string) => Promise<{ success: boolean; errorMsg?: string }>;
   updateMemberRole: (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => Promise<{ success: boolean; errorMsg?: string }>;
   removeMember: (partyId: string, memberId: string) => Promise<{ success: boolean; errorMsg?: string }>;
@@ -46,6 +47,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
   members: [],
   events: [],
   isLoading: false,
+  isJoiningParty: false,
   error: null,
 
   fetchEvents: async (partyId: string) => {
@@ -158,7 +160,8 @@ export const usePartyStore = create<PartyState>((set, get) => ({
   },
 
   joinParty: async (joinCode: string, referrerId?: string) => {
-    set({ isLoading: true, error: null });
+    if (get().isJoiningParty) return { partyId: '', alreadyJoined: true, ignored: true };
+    set({ isJoiningParty: true, isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Giriş yapmanız gerekiyor.');
@@ -224,7 +227,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       set({ error: err.message });
       return null;
     } finally {
-      set({ isLoading: false });
+      set({ isLoading: false, isJoiningParty: false });
     }
   },
 

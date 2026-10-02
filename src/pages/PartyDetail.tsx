@@ -262,7 +262,7 @@ export const PartyDetail = () => {
           >
             <Icon name="logout" size={20} />
           </button>
-          
+
           {myMember?.role === 'owner' && (
             <button
               onClick={() => setIsConfirmDeleteOpen(true)}
@@ -732,4 +732,5 @@ export const PartyDetail = () => {
       />
     </div>
   );
+
 };

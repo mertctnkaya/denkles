@@ -32,6 +32,7 @@ export const JoinPage = () => {
   const handleJoin = async (joinCode: string, referrerId?: string) => {
     const result = await joinParty(joinCode, referrerId);
     if (result) {
+      if (result.ignored) return; // Zaten bir join işlemi yürütülüyor, toast atma
       if (result.alreadyJoined) {
         addToast('Zaten bu gruptasınız.', 'info');
       } else {

@@ -160,7 +160,7 @@ export const Profile = () => {
         fullWidth
         icon="logout"
         onClick={handleLogout}
-        className="bg-transparent border-2 !border-danger hover:bg-danger text-danger hover:text-white mt-2"
+        className="bg-transparent border-2 border-danger! hover:bg-danger text-danger hover:text-white mt-2"
       >
         Çıkış Yap
       </Button>
