@@ -51,6 +51,10 @@ export const PartySettingsModal = ({ isOpen, onClose, party, myMember, netBalanc
   };
 
   const handleLeave = () => {
+    if (party.is_archived) {
+      addToast('Arşivlenmiş gruptan çıkılamaz. Önce arşivi kaldırın.', 'error');
+      return;
+    }
     if (netBalance !== 0) {
       addToast(`Gruptan ayrılabilmek için bakiyenizin sıfır olması gerekiyor (Mevcut: ${netBalance > 0 ? '+' : ''}${netBalance} TL).`, 'warning');
       return;

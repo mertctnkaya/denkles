@@ -104,7 +104,7 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
 
   return (
     <div className="py-4 space-y-4">
-      {canManageMembers && (
+      {canManageMembers && !party.is_archived && (
         <button
           onClick={() => setIsAddGhostModalOpen(true)}
           className="w-full flex items-center justify-center cursor-pointer gap-2 p-3 bg-primary/10 text-primary-dark dark:text-primary-light hover:bg-primary/20 rounded-2xl font-bold transition-colors border border-primary/20 border-dashed"

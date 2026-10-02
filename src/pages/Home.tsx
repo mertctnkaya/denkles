@@ -27,6 +27,20 @@ export const Home = () => {
 
   useEffect(() => {
     fetchParties();
+
+    // Davet linkinden geldiyse, login olduktan sonra otomatik katil
+    const pendingCode = localStorage.getItem('pending_join_code');
+    if (pendingCode) {
+      localStorage.removeItem('pending_join_code');
+      usePartyStore.getState().joinParty(pendingCode).then((joinedId) => {
+        if (joinedId) {
+          addToast('Davet linki ile gruba katıldınız!', 'success');
+          navigate(`/party/${joinedId}`);
+        } else {
+          addToast('Davet linki geçersiz veya gruba zaten üyesiniz.', 'error');
+        }
+      });
+    }
   }, [fetchParties]);
 
   useEffect(() => {
@@ -199,17 +213,31 @@ export const Home = () => {
                       <Icon name="archive" size={14} className="text-slate-400 shrink-0" title="Arşivlendi" />
                     )}
                   </div>
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(party.join_code);
-                      addToast('Davet kodu kopyalandı!', 'success');
-                    }}
-                    className="inline-flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-1 rounded-md transition-colors"
-                    title="Kodu kopyala"
-                  >
-                    <span className="text-xs font-bold tracking-wider">{party.join_code}</span>
-                    <Icon name="copy" size={12} />
+                  <div className="flex items-center gap-2 mt-2">
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(party.join_code);
+                        addToast('Davet kodu kopyalandı!', 'success');
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-primary/10 hover:bg-primary/20 text-primary-dark dark:text-primary-light px-2 py-1 rounded-md transition-colors"
+                      title="Kodu kopyala"
+                    >
+                      <span className="text-xs font-bold tracking-wider">{party.join_code}</span>
+                      <Icon name="copy" size={12} />
+                    </div>
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const inviteLink = `${window.location.origin}/join/${party.join_code}`;
+                        navigator.clipboard.writeText(inviteLink);
+                        addToast('Davet linki kopyalandı!', 'success');
+                      }}
+                      className="inline-flex items-center justify-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 w-6 h-6 rounded-md transition-colors"
+                      title="Davet linkini kopyala"
+                    >
+                      <Icon name="link" size={12} />
+                    </div>
                   </div>
                 </div>
               </div>

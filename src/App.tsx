@@ -6,6 +6,7 @@ import { Auth } from './pages/Auth';
 import { Landing } from './pages/Landing';
 import { Profile } from './pages/Profile';
 import { PartyDetail } from './pages/PartyDetail';
+import { JoinPage } from './pages/JoinPage';
 import { NotFound } from './pages/NotFound';
 import { Parties } from './pages/Parties';
 import { useThemeStore } from './store/themeStore';
@@ -38,12 +39,14 @@ function App() {
             {/* Giriş yapmamış kullanıcılar için Açılış Sayfası ve Giriş Ekranı */}
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/join/:code" element={<JoinPage />} />
             {/* Bilinmeyen rotalarda (örn: /parties) giriş yapmadığı için Landing'e atar */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </>
         ) : (
           <Route element={<AppLayout />}>
             <Route path="/" element={<Home />} />
+            <Route path="/join/:code" element={<JoinPage />} />
             <Route path="/auth" element={<Navigate to="/" replace />} />
             <Route path="/parties" element={<Parties />} />
             <Route path="/party/:id" element={<PartyDetail />} />
