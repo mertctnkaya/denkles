@@ -241,7 +241,8 @@ export const Home = () => {
                     <div
                       onClick={(e) => {
                         e.stopPropagation();
-                        const inviteLink = `${window.location.origin}/join/${party.join_code}`;
+                        const refParam = user?.id ? `?ref=${user.id}` : '';
+                        const inviteLink = `${window.location.origin}/join/${party.join_code}${refParam}`;
                         navigator.clipboard.writeText(inviteLink);
                         addToast('Davet linki kopyalandı!', 'success');
                       }}

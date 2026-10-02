@@ -47,6 +47,8 @@ export const JoinPage = () => {
 
   const handleGuestJoin = async () => {
     if (!guestName.trim() || !code) return;
+    if (hasAttemptedJoin.current) return;
+    hasAttemptedJoin.current = true;
     setIsAnonymousLoading(true);
     try {
       // 1. Supabase Anonymous SignIn
@@ -58,9 +60,10 @@ export const JoinPage = () => {
         data: { full_name: guestName.trim() }
       });
       
-      // authStore onAuthStateChange tetiklenecek ve App yeniden render olacak.
-      // Bu sayfa tekrar yüklendiğinde session olduğu için useEffect handleJoin'i çağıracak.
+      // 3. Direkt katıl (useEffect'e bırakmak yerine burada çağır — çoklu toast'u önler)
+      await handleJoin(code, refId);
     } catch (err: any) {
+      hasAttemptedJoin.current = false;
       addToast(err.message || 'Misafir girişi başarısız oldu.', 'error');
       setIsAnonymousLoading(false);
     }

@@ -175,12 +175,17 @@ export const usePartyStore = create<PartyState>((set, get) => ({
         return { partyId, alreadyJoined: true };
       }
 
+      // getUser bir kez daha çağır — misafir adını updateUser ile yeni yazmış olabilir,
+      // stale metadata'dan "Üye" yazmasını engelle
+      const { data: { user: freshUser } } = await supabase.auth.getUser();
+      const displayName = freshUser?.user_metadata?.full_name || user.user_metadata?.full_name || 'Üye';
+
       const { error: joinError } = await supabase
         .from('party_members')
         .insert([{
           party_id: partyId,
           profile_id: user.id,
-          display_name: user.user_metadata?.full_name || 'Üye',
+          display_name: displayName,
           role: 'member'
         }]);
 
@@ -198,7 +203,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
           }
 
           if (referrerId) {
-            const { data: referrer } = await supabase.from('party_members').select('display_name').eq('id', referrerId).maybeSingle();
+            const { data: referrer } = await supabase.from('party_members').select('display_name').eq('profile_id', referrerId).eq('party_id', partyId).maybeSingle();
             if (referrer) {
               desc += ` (Davet eden: ${referrer.display_name})`;
             }

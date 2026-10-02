@@ -228,7 +228,7 @@ export const PartyDetail = () => {
               </div>
               <div
                 onClick={() => {
-                  const inviteLink = `${window.location.origin}/join/${currentParty.join_code}?ref=${myMember.id}`;
+                  const inviteLink = `${window.location.origin}/join/${currentParty.join_code}?ref=${user?.id || ''}`;
                   navigator.clipboard.writeText(inviteLink);
                   addToast('Davet linki kopyalandı!', 'success');
                 }}
@@ -457,8 +457,10 @@ export const PartyDetail = () => {
               {(events || []).map(event => {
                 const actor = (members || []).find(m => m.id === event.actor_id);
                 const isMe = actor?.profile_id === user?.id;
-                const displayName = actor?.display_name || 'Biri';
-                const formattedName = isMe ? `${displayName} (Sen)` : displayName;
+                // Eğer actor artık grupta yoksa (ayrıldı/çıkarıldı), description zaten adı içeriyor.
+                // Bu durumda ek isim yazmaya gerek yok.
+                const displayName = actor ? actor.display_name : '';
+                const formattedName = actor ? (isMe ? `${displayName} (Sen)` : displayName) : '';
 
                 let eventIcon = 'info';
                 let eventColor = 'text-slate-500';
