@@ -38,9 +38,11 @@ export const PartyDetail = () => {
   const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [isDeletingParty, setIsDeletingParty] = useState(false);
+  const [hasFetched, setHasFetched] = useState(false);
 
   useEffect(() => {
     if (id) {
+      setHasFetched(true);
       fetchPartyDetails(id);
       fetchShares(id);
       fetchEvents(id);
@@ -145,8 +147,18 @@ export const PartyDetail = () => {
     return balance;
   }, [myMember, computedDebts]);
 
-  // 1. Durum: İlk sayfa yüklemesi (parti verisi henüz hiç gelmediyse)
-  if (isLoading && !currentParty) {
+  useEffect(() => {
+    // Sadece fetch işlemi bittiğinde, silme/çıkma işlemi yapılmıyorsa ve HEDEF partide değilsek veya yetki yoksa hata ver
+    if (hasFetched && !isLoading && !isDeletingParty && !isLeaving) {
+      if (error || !currentParty || (currentParty.id === id && !myMember)) {
+        addToast(error || 'Grup bulunamadı veya yetkiniz yok.', 'error');
+        navigate('/', { replace: true });
+      }
+    }
+  }, [hasFetched, isLoading, isDeletingParty, isLeaving, error, currentParty, myMember, id, navigate, addToast]);
+
+  // 1. Durum: İlk sayfa yüklemesi veya farklı bir grubun verisi kalmışsa
+  if (!hasFetched || isLoading || (currentParty && currentParty.id !== id)) {
     return (
       <div className="flex-1 flex items-center justify-center p-6 min-h-[50vh]">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -154,23 +166,19 @@ export const PartyDetail = () => {
     );
   }
 
-  // 2. Durum: Yüklendi ama parti yok, hata var veya kullanıcı bu grupta değil
+  // 2. Durum: Yüklendi ama parti yok, hata var veya kullanıcı bu grupta değil (useEffect navigate edecek)
   if (error || !currentParty || !myMember) {
-    setTimeout(() => {
-      addToast(error || 'Grup bulunamadı veya yetkiniz yok.', 'error');
-      navigate('/', { replace: true });
-    }, 0);
     return null;
   }
 
   const performDeleteParty = async () => {
     setIsDeletingParty(true);
     const { success, errorMsg } = await usePartyStore.getState().deleteParty(currentParty.id);
-    setIsDeletingParty(false);
     if (success) {
       addToast('Grup başarıyla silindi.', 'success');
       navigate('/');
     } else {
+      setIsDeletingParty(false);
       addToast(errorMsg || 'Grup silinirken bir hata oluştu.', 'error');
       setIsConfirmDeleteOpen(false);
     }
@@ -179,11 +187,11 @@ export const PartyDetail = () => {
   const performLeaveParty = async () => {
     setIsLeaving(true);
     const { success, errorMsg } = await usePartyStore.getState().leaveParty(currentParty.id, myMember!.id);
-    setIsLeaving(false);
     if (success) {
       addToast('Gruptan ayrıldınız.', 'success');
       navigate('/');
     } else {
+      setIsLeaving(false);
       addToast(errorMsg || 'Gruptan ayrılırken bir hata oluştu.', 'error');
       setIsConfirmLeaveOpen(false);
     }
