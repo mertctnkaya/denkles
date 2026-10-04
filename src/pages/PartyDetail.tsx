@@ -40,7 +40,6 @@ export const PartyDetail = () => {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isDeletingParty, setIsDeletingParty] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
-  const [isDesktopMenuOpen, setIsDesktopMenuOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -348,10 +347,9 @@ export const PartyDetail = () => {
         </div>
       </div>
 
-      {/* 3. TABS & DESKTOP ACTION BUTTON */}
-      <div className="px-4 md:px-6 mb-2 flex items-center justify-between gap-4">
-        {/* Tabs Container */}
-        <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl flex-1">
+      {/* 3. TABS (Hareketler & Hesaplaşma) */}
+      <div className="px-4 md:px-6 mb-2">
+        <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl">
           <button
             onClick={() => setActiveTab('feed')}
             className={`flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition-all ${activeTab === 'feed' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
@@ -377,53 +375,6 @@ export const PartyDetail = () => {
             Geçmiş
           </button>
         </div>
-
-        {/* Desktop Only Dropdown Action Button */}
-        {!currentParty.is_archived && (
-          <div className="hidden md:block relative">
-            <button
-              onClick={() => setIsDesktopMenuOpen(!isDesktopMenuOpen)}
-              className="h-[38px] px-4 bg-primary hover:bg-primary-dark text-white rounded-lg shadow-sm shadow-primary/30 flex items-center gap-2 font-bold text-sm transition-colors cursor-pointer"
-            >
-              <Icon name="plus" size={16} />
-              <span className="tracking-wide">İşlem</span>
-            </button>
-
-            {isDesktopMenuOpen && (
-              <>
-                {/* Invisible backdrop */}
-                <div className="fixed inset-0 z-30" onClick={() => setIsDesktopMenuOpen(false)}></div>
-                {/* Dropdown Menu (Drops downwards) */}
-                <div className="absolute top-full right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-40">
-                  <button
-                    onClick={() => { setIsAddShareModalOpen(true); setIsDesktopMenuOpen(false); }}
-                    className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                      <Icon name="plus" size={16} />
-                    </div>
-                    Yeni Harcama
-                  </button>
-                  {canManageMembers && (
-                    <button
-                      onClick={() => {
-                        setIsDesktopMenuOpen(false);
-                        setActiveTab('members');
-                        setGlobalAction('add_ghost');
-                      }}
-                      className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700/50 transition-colors"
-                    >
-                      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
-                        <Icon name="user" size={16} />
-                      </div>
-                      Hayalet Üye Ekle
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        )}
       </div>
 
       {/* 4. İÇERİK ALANI */}
