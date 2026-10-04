@@ -40,6 +40,7 @@ export const PartyDetail = () => {
   const [isLeaving, setIsLeaving] = useState(false);
   const [isDeletingParty, setIsDeletingParty] = useState(false);
   const [hasFetched, setHasFetched] = useState(false);
+  const [isDesktopMenuOpen, setIsDesktopMenuOpen] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -62,6 +63,9 @@ export const PartyDetail = () => {
     if (globalAction === 'new_share') {
       setIsAddShareModalOpen(true);
       clearGlobalAction();
+    } else if (globalAction === 'add_ghost') {
+      setActiveTab('members');
+      // We DO NOT clear the action here, so PartyMembersTab can pick it up on mount!
     }
   }, [globalAction, clearGlobalAction]);
 
@@ -207,6 +211,7 @@ export const PartyDetail = () => {
   };
 
   const isPositive = myNetBalance > 0;
+  const canManageMembers = myMember?.role === 'owner' || myMember?.role === 'admin';
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 pb-24 md:pb-6 relative min-h-screen md:min-h-[85vh] md:rounded-3xl md:border md:border-slate-200/50 dark:md:border-slate-800 md:shadow-lg overflow-hidden">
@@ -253,18 +258,7 @@ export const PartyDetail = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 md:gap-3">
-          {/* Desktop Only: Yeni Harcama Button */}
-          {!currentParty.is_archived && (
-            <button
-              onClick={() => setIsAddShareModalOpen(true)}
-              className="hidden md:flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shadow-primary/20 hover:shadow-md cursor-pointer"
-            >
-              <Icon name="plus" size={16} />
-              Yeni Harcama
-            </button>
-          )}
-
+        <div className="flex items-center gap-1">
           <button
             onClick={() => {
               if (myNetBalance !== 0) {
@@ -612,7 +606,53 @@ export const PartyDetail = () => {
         ) : null}
       </div>
 
-      {/* 5. FLOATING ACTION BUTTON (Yeni Harcama) - Kaldırıldı, artık BottomNav Action Sheet üzerinden tetikleniyor. */}
+      {/* 5. FLOATING ACTION BUTTON (Desktop Dropup) */}
+      {!currentParty.is_archived && (
+        <div className="hidden md:block absolute bottom-8 right-8 z-40">
+          {isDesktopMenuOpen && (
+            <>
+              {/* Invisible backdrop to close on click outside */}
+              <div 
+                className="fixed inset-0 z-30" 
+                onClick={() => setIsDesktopMenuOpen(false)}
+              ></div>
+              <div className="absolute bottom-16 right-0 mb-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-40">
+                <button
+                  onClick={() => { setIsAddShareModalOpen(true); setIsDesktopMenuOpen(false); }}
+                  className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <Icon name="plus" size={16} />
+                  </div>
+                  Yeni Harcama
+                </button>
+                {canManageMembers && (
+                  <button
+                    onClick={() => {
+                      setIsDesktopMenuOpen(false);
+                      setActiveTab('members');
+                      setGlobalAction('add_ghost');
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50 flex items-center gap-3 border-t border-slate-100 dark:border-slate-700/50 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                      <Icon name="user" size={16} />
+                    </div>
+                    Hayalet Üye Ekle
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+          
+          <button
+            onClick={() => setIsDesktopMenuOpen(!isDesktopMenuOpen)}
+            className={`relative z-40 w-14 h-14 bg-primary hover:bg-primary-dark text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center transition-transform hover:scale-105 active:scale-95 cursor-pointer ${isDesktopMenuOpen ? 'rotate-45' : ''}`}
+          >
+            <Icon name="plus" size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+      )}
 
       {/* Yeni / Düzenle Harcama Modalı */}
       {user && (

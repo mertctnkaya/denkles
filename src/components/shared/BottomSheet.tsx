@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { Icon } from './Icon';
 
 interface BottomSheetProps {
   isOpen: boolean;
@@ -30,7 +29,7 @@ export const BottomSheet = ({ isOpen, onClose, children }: BottomSheetProps) => 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-6 md:hidden">
+    <div className="fixed inset-0 z-100 flex items-end sm:items-center justify-center p-0 sm:p-6 md:hidden">
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-slate-900/40 dark:bg-slate-900/60 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
@@ -43,7 +42,7 @@ export const BottomSheet = ({ isOpen, onClose, children }: BottomSheetProps) => 
         <div className="w-full flex justify-center py-3" onClick={onClose}>
           <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-700 rounded-full"></div>
         </div>
-        
+
         {/* Body */}
         <div className="px-6 pb-6 overflow-y-auto custom-scrollbar">
           {children}

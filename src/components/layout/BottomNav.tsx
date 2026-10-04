@@ -11,7 +11,7 @@ export const BottomNav = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  
+
   const { parties, currentParty, members } = usePartyStore();
   const { user } = useAuthStore();
   const { setGlobalAction } = useUiStore();
@@ -54,7 +54,7 @@ export const BottomNav = () => {
 
             {/* Center Floating Action Button */}
             <div className="relative -top-6">
-              <button 
+              <button
                 onClick={handlePlusClick}
                 className="flex items-center justify-center w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 hover:scale-105 transition-transform active:scale-95 cursor-pointer"
               >
@@ -73,7 +73,7 @@ export const BottomNav = () => {
         <div className="space-y-2">
           {isPartyPage ? (
             <>
-              <button 
+              <button
                 onClick={() => handleAction('new_share')}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-primary/10 text-primary-dark dark:text-primary-light hover:bg-primary/20 transition-colors font-bold text-left"
               >
@@ -84,7 +84,7 @@ export const BottomNav = () => {
               </button>
 
               {canManageMembers && !currentParty?.is_archived && (
-                <button 
+                <button
                   onClick={() => handleAction('add_ghost')}
                   className="w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors font-bold text-left mt-2"
                 >
@@ -97,7 +97,7 @@ export const BottomNav = () => {
             </>
           ) : (
             <>
-              <button 
+              <button
                 onClick={() => handleAction('new_group')}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-primary/10 text-primary-dark dark:text-primary-light hover:bg-primary/20 transition-colors font-bold text-left"
               >
@@ -107,7 +107,7 @@ export const BottomNav = () => {
                 <span>Grup Oluştur</span>
               </button>
 
-              <button 
+              <button
                 onClick={() => handleAction('join_group')}
                 className="w-full flex items-center gap-4 p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors font-bold text-left"
               >
@@ -135,7 +135,7 @@ export const BottomNav = () => {
                         }}
                         className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors text-left"
                       >
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-linear-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg shrink-0">
                           {p.name.charAt(0).toUpperCase()}
                         </div>
                         <span className="font-bold text-slate-700 dark:text-slate-200 truncate">{p.name}</span>
