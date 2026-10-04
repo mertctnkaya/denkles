@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
 import { usePartyStore } from '../store/partyStore';
 import { useHomeStore } from '../store/homeStore';
+import { useUiStore } from '../store/uiStore';
 import { Icon } from '../components/shared/Icon';
 import { Button } from '../components/shared/Button';
 import { Modal } from '../components/shared/Modal';
@@ -56,6 +57,18 @@ export const Home = () => {
       fetchDashboardData(user.id);
     }
   }, [user, parties.length, fetchDashboardData]); // partiler eklendikçe dashboard'ı güncelle
+
+  const { globalAction, clearGlobalAction } = useUiStore();
+  
+  useEffect(() => {
+    if (globalAction === 'new_group') {
+      setIsNewGroupModalOpen(true);
+      clearGlobalAction();
+    } else if (globalAction === 'join_group') {
+      setIsJoinModalOpen(true);
+      clearGlobalAction();
+    }
+  }, [globalAction, clearGlobalAction]);
 
   const activeParties = parties.filter(p => !p.is_archived);
   

@@ -8,6 +8,8 @@ import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
 
 import { useShareStore } from '../../store/shareStore';
+import { useUiStore } from '../../store/uiStore';
+import { useEffect } from 'react';
 
 interface PartyMembersTabProps {
   party: Party;
@@ -19,8 +21,17 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
   const { updateMemberRole, removeMember, addShadowMember } = usePartyStore();
   const { fetchShares } = useShareStore();
   const { addToast } = useToastStore();
+  const { globalAction, clearGlobalAction } = useUiStore();
 
   const [isAddGhostModalOpen, setIsAddGhostModalOpen] = useState(false);
+  
+  useEffect(() => {
+    if (globalAction === 'add_ghost') {
+      setIsAddGhostModalOpen(true);
+      clearGlobalAction();
+    }
+  }, [globalAction, clearGlobalAction]);
+
   const [ghostName, setGhostName] = useState('');
   const [isAddingGhost, setIsAddingGhost] = useState(false);
 

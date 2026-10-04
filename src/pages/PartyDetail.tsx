@@ -4,6 +4,7 @@ import { usePartyStore } from '../store/partyStore';
 import { useShareStore } from '../store/shareStore';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
+import { useUiStore } from '../store/uiStore';
 import { Icon } from '../components/shared/Icon';
 import { Button } from '../components/shared/Button';
 import { Modal } from '../components/shared/Modal';
@@ -49,12 +50,20 @@ export const PartyDetail = () => {
     }
   }, [id, fetchPartyDetails, fetchShares, fetchEvents]);
 
-  // Refresh events when shares or members change (due to actions like addShare, settleDebt, removeMember, changeRole, editShare)
   useEffect(() => {
     if (id) {
       fetchEvents(id);
     }
   }, [id, shares, members, fetchEvents]);
+
+  const { globalAction, clearGlobalAction } = useUiStore();
+  
+  useEffect(() => {
+    if (globalAction === 'new_share') {
+      setIsAddShareModalOpen(true);
+      clearGlobalAction();
+    }
+  }, [globalAction, clearGlobalAction]);
 
   const handleAddShare = async (
     title: string,
@@ -244,7 +253,18 @@ export const PartyDetail = () => {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 md:gap-3">
+          {/* Desktop Only: Yeni Harcama Button */}
+          {!currentParty.is_archived && (
+            <button
+              onClick={() => setIsAddShareModalOpen(true)}
+              className="hidden md:flex items-center gap-2 bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl text-sm font-bold transition-all shadow-sm shadow-primary/20 hover:shadow-md cursor-pointer"
+            >
+              <Icon name="plus" size={16} />
+              Yeni Harcama
+            </button>
+          )}
+
           <button
             onClick={() => {
               if (myNetBalance !== 0) {
@@ -592,18 +612,7 @@ export const PartyDetail = () => {
         ) : null}
       </div>
 
-      {/* 5. FLOATING ACTION BUTTON (Yeni Harcama) */}
-      {!currentParty.is_archived && (
-        <div className="fixed bottom-20 md:bottom-8 right-4 md:right-8 z-50">
-          <button
-            onClick={() => setIsAddShareModalOpen(true)}
-            className="h-14 px-6 bg-primary hover:bg-primary-dark text-white rounded-full shadow-lg shadow-primary/30 flex items-center justify-center gap-2 font-bold text-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
-          >
-            <Icon name="plus" size={20} />
-            Yeni Harcama
-          </button>
-        </div>
-      )}
+      {/* 5. FLOATING ACTION BUTTON (Yeni Harcama) - Kaldırıldı, artık BottomNav Action Sheet üzerinden tetikleniyor. */}
 
       {/* Yeni / Düzenle Harcama Modalı */}
       {user && (
