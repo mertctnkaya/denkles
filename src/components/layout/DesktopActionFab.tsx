@@ -41,17 +41,20 @@ export const DesktopActionFab = () => {
   };
 
   return (
-    <div className="hidden md:block fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+    <>
+      {/* Backdrop placed OUTSIDE the transformed container to work correctly */}
       {isOpen && (
-        <>
-          {/* Backdrop to close when clicking outside */}
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setIsOpen(false)} 
-          />
-          
-          {/* Drop-up Menu */}
-          <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-72 bg-white dark:bg-slate-900 rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-black/50 border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 z-50">
+        <div 
+          className="hidden md:block fixed inset-0 z-40" 
+          onClick={() => setIsOpen(false)} 
+        />
+      )}
+
+      <div className="hidden md:block fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+        {isOpen && (
+          <>
+            {/* Drop-up Menu */}
+            <div className="absolute bottom-[calc(100%+12px)] left-1/2 -translate-x-1/2 w-72 bg-white dark:bg-slate-900 rounded-3xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-black/50 border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 z-50">
             <div className="p-2 space-y-2">
               {isPartyPage ? (
                 <>
@@ -130,16 +133,18 @@ export const DesktopActionFab = () => {
               )}
             </div>
           </div>
-        </>
-      )}
+          </>
+        )}
 
-      {/* FAB Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-center w-14 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all cursor-pointer relative z-50 ${isOpen ? 'rotate-45' : ''}`}
-      >
-        <Icon name="plus" size={28} strokeWidth={2.5} />
-      </button>
-    </div>
+        {/* FAB Button */}
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={`flex items-center justify-center gap-2.5 px-7 h-14 bg-primary text-white rounded-full shadow-lg shadow-primary/30 hover:scale-105 active:scale-95 transition-all cursor-pointer relative z-50`}
+        >
+          <Icon name="plus" size={24} strokeWidth={2.5} className={`${isOpen ? 'rotate-45' : ''} transition-transform`} />
+          <span className="font-bold tracking-wide">Yeni Oluştur</span>
+        </button>
+      </div>
+    </>
   );
 };
