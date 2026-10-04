@@ -479,8 +479,8 @@ export const PartyDetail = () => {
                 let eventColor = 'text-slate-500';
                 let eventBg = 'bg-slate-100 dark:bg-slate-800';
 
-                if (event.event_type.includes('member_added')) { eventIcon = 'plus'; eventColor = 'text-emerald-500'; }
-                if (event.event_type.includes('member_removed')) { eventIcon = 'close'; eventColor = 'text-rose-500'; }
+                if (event.event_type.includes('member_added') || event.event_type.includes('member_joined')) { eventIcon = 'plus'; eventColor = 'text-emerald-500'; }
+                if (event.event_type.includes('member_removed') || event.event_type.includes('member_left')) { eventIcon = 'close'; eventColor = 'text-rose-500'; }
                 if (event.event_type.includes('debt_settled')) { eventIcon = 'success'; eventColor = 'text-emerald-500'; }
                 if (event.event_type.includes('role_updated')) { eventIcon = 'shield'; eventColor = 'text-orange-500'; }
                 if (event.event_type.includes('share_deleted')) { eventIcon = 'trash'; eventColor = 'text-rose-500'; }

@@ -222,14 +222,16 @@ export const usePartyStore = create<PartyState>((set, get) => ({
 
             await supabase.from('party_events').insert([{
               party_id: partyId,
-              actor_id: newMember.id,
+              actor_id: null, // cascade silinmeyi önlemek için null yapıyoruz
               event_type: 'member_joined',
-              description: desc
+              description: desc,
+              metadata: { profile_id: user.id }
             }]);
           }
         }
 
         await get().fetchParties();
+        await get().fetchEvents(partyId); // geçmişe anında düşmesi için
         return { partyId, alreadyJoined: false };
       } catch (err: any) {
         set({ error: err.message });
@@ -500,13 +502,14 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Ayrılmadan hemen önce üye adını alıp log atıyoruz (silinince event'teki actor_id NULL'a düşecek)
-      const { data: leavingMember } = await supabase.from('party_members').select('display_name').eq('id', memberId).single();
+      const { data: leavingMember } = await supabase.from('party_members').select('display_name, profile_id').eq('id', memberId).single();
       if (leavingMember) {
         await supabase.from('party_events').insert([{
           party_id: partyId,
-          actor_id: memberId,
+          actor_id: null,
           event_type: 'member_left',
-          description: `"${leavingMember.display_name}" gruptan ayrıldı.`
+          description: `"${leavingMember.display_name}" gruptan ayrıldı.`,
+          metadata: { profile_id: leavingMember.profile_id }
         }]);
       }
 
