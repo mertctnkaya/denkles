@@ -5,6 +5,7 @@ import { Home } from './pages/Home';
 import { Auth } from './pages/Auth';
 import { Landing } from './pages/Landing';
 import { Profile } from './pages/Profile';
+import { Activity } from './pages/Activity';
 import { PartyDetail } from './pages/PartyDetail';
 import { JoinPage } from './pages/JoinPage';
 import { NotFound } from './pages/NotFound';
@@ -50,7 +51,7 @@ function App() {
             <Route path="/auth" element={<Navigate to="/" replace />} />
             <Route path="/parties" element={<Parties />} />
             <Route path="/party/:id" element={<PartyDetail />} />
-            <Route path="/activity" element={<div className="p-6 pt-12"><h2 className="font-bold text-xl">Hareketler</h2></div>} />
+            <Route path="/activity" element={<Activity />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Route>

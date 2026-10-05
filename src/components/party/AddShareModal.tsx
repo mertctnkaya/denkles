@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
 import { Icon } from '../shared/Icon';
 import type { IconName } from '../shared/Icon';
-import type { PartyMember, Share } from '../../types/database';
+import type { PartyMember, Share, ShareCategory } from '../../types/database';
 
 interface AddShareModalProps {
   isOpen: boolean;
@@ -19,15 +19,20 @@ interface AddShareModalProps {
     category: Share['category'],
     participants: string[],
     splitMode: 'equal' | 'percentage' | 'exact' | 'shares',
-    customValues?: Record<string, number>
+    customValues?: Record<string, number>,
+    metadata?: Record<string, any>
   ) => Promise<boolean>;
 }
 
-const CATEGORIES: { id: Share['category']; label: string; icon: IconName; color: string }[] = [
+const CATEGORIES: { id: ShareCategory; label: string; icon: IconName; color: string }[] = [
   { id: 'general', label: 'Genel', icon: 'receipt', color: 'bg-slate-100 text-slate-600' },
-  { id: 'fuel', label: 'Yakıt', icon: 'camera', color: 'bg-orange-100 text-orange-600' },
+  { id: 'fuel', label: 'Yakıt', icon: 'car', color: 'bg-orange-100 text-orange-600' },
   { id: 'restaurant', label: 'Yemek', icon: 'star', color: 'bg-red-100 text-red-600' },
   { id: 'shopping', label: 'Market', icon: 'card', color: 'bg-blue-100 text-blue-600' },
+  { id: 'accommodation', label: 'Konaklama', icon: 'building', color: 'bg-indigo-100 text-indigo-600' },
+  { id: 'transport', label: 'Ulaşım', icon: 'forward', color: 'bg-teal-100 text-teal-600' },
+  { id: 'entertainment', label: 'Eğlence', icon: 'music', color: 'bg-fuchsia-100 text-fuchsia-600' },
+  { id: 'health', label: 'Sağlık', icon: 'health', color: 'bg-rose-100 text-rose-600' },
 ];
 
 export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, initialShare, initialParticipants }: AddShareModalProps) => {
@@ -35,12 +40,13 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
 
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<Share['category']>('general');
+  const [category, setCategory] = useState<ShareCategory>('general');
   const [splitMode, setSplitMode] = useState<'equal' | 'percentage' | 'exact' | 'shares'>('equal');
   const [customValues, setCustomValues] = useState<Record<string, number>>({});
   const [paidBy, setPaidBy] = useState<string>(me?.id || '');
   const [selectedParticipants, setSelectedParticipants] = useState<string[]>(members.map(m => m.id));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [metadata, setMetadata] = useState<Record<string, any>>({});
 
   // When initialShare is provided, populate the form
   useMemo(() => {
@@ -50,10 +56,11 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
         setAmount(initialShare.total_amount.toString());
         setCategory(initialShare.category);
         setSplitMode(initialShare.split_mode as any);
-        
+        setMetadata(initialShare.metadata || {});
+
         const payer = initialParticipants.find(p => p.paid_amount > 0);
         setPaidBy(payer?.party_member_id || me?.id || '');
-        
+
         const participantsList = initialParticipants.map(p => p.party_member_id);
         setSelectedParticipants(participantsList);
 
@@ -65,9 +72,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
             } else if (initialShare.split_mode === 'percentage') {
               cVals[p.party_member_id] = (p.owed_amount / initialShare.total_amount) * 100;
             } else if (initialShare.split_mode === 'shares') {
-              // Can't reconstruct exact shares perfectly if they were simplified, so fallback to exact owed_amount
-              // To handle this properly, split_mode 'shares' would need to be stored in metadata. We'll fallback to owed_amount.
-              cVals[p.party_member_id] = p.owed_amount; 
+              cVals[p.party_member_id] = p.owed_amount;
             }
           });
           setCustomValues(cVals);
@@ -80,11 +85,23 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
         setCategory('general');
         setSplitMode('equal');
         setCustomValues({});
+        setMetadata({});
         setPaidBy(me?.id || '');
         setSelectedParticipants(members.map(m => m.id));
       }
     }
   }, [isOpen, initialShare, initialParticipants, me?.id]);
+
+  // Fuel auto-calculation effect
+  useEffect(() => {
+    if (category === 'fuel') {
+      const liters = parseFloat(metadata.liters);
+      const price = parseFloat(metadata.price_per_liter);
+      if (!isNaN(liters) && !isNaN(price) && liters > 0 && price > 0) {
+        setAmount((liters * price).toFixed(2));
+      }
+    }
+  }, [category, metadata.liters, metadata.price_per_liter]);
 
   const handleClose = () => {
     onClose();
@@ -95,6 +112,12 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
     if (selectedParticipants.length === 0) return;
 
     setIsSubmitting(true);
+    // Clean metadata (remove empty strings or undefined)
+    const cleanedMetadata: Record<string, any> = {};
+    Object.entries(metadata).forEach(([k, v]) => {
+      if (v !== '' && v !== null && v !== undefined) cleanedMetadata[k] = v;
+    });
+
     const success = await onAdd(
       title.trim(),
       parseFloat(amount),
@@ -102,7 +125,8 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
       category,
       selectedParticipants,
       splitMode,
-      customValues
+      customValues,
+      Object.keys(cleanedMetadata).length > 0 ? cleanedMetadata : undefined
     );
     setIsSubmitting(false);
 
@@ -120,7 +144,6 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
   };
 
   const parsedAmount = parseFloat(amount) || 0;
-
   const customSum = useMemo(() => {
     return selectedParticipants.reduce((sum, pid) => sum + (customValues[pid] || 0), 0);
   }, [customValues, selectedParticipants]);
@@ -134,7 +157,6 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
   }, [splitMode, customSum, parsedAmount]);
 
   const isFormValid = title.trim() && parsedAmount > 0 && selectedParticipants.length > 0 && isCustomValuesValid;
-
   const isEditing = !!initialShare;
 
   return (
@@ -158,7 +180,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
       }
     >
       <div className="space-y-6">
-        {/* Tutar ve Başlık */}
+        {/* Başlık ve Tutar */}
         <div className="flex gap-4">
           <div className="flex-1">
             <label className="block text-xs font-semibold text-slate-500 mb-1">Ne İçin?</label>
@@ -187,13 +209,13 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
         {/* Kategori Seçimi */}
         <div>
           <label className="block text-xs font-semibold text-slate-500 mb-2">Kategori</label>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar snap-x -mx-4 px-4 md:mx-0 md:px-0">
             {CATEGORIES.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setCategory(cat.id)}
-                className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all ${category === cat.id
-                  ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                className={`snap-start shrink-0 flex flex-col items-center justify-center p-3 w-20 rounded-2xl border-2 transition-all cursor-pointer ${category === cat.id
+                  ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-sm'
                   : 'border-transparent bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700'
                   }`}
               >
@@ -207,6 +229,95 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
             ))}
           </div>
         </div>
+
+        {/* Dinamik Kategori Alanları (Opsiyonel) */}
+        {category !== 'general' && (
+          <div className="bg-slate-50/80 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/50 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Icon name="info" size={14} className="text-slate-400" />
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Opsiyonel Detaylar</span>
+            </div>
+
+            {category === 'fuel' && (
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Litre</label>
+                  <input type="number" placeholder="Örn: 25.5" value={metadata.liters || ''} onChange={e => setMetadata({ ...metadata, liters: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Birim Fiyat (₺)</label>
+                  <input type="number" placeholder="Örn: 42.10" value={metadata.price_per_liter || ''} onChange={e => setMetadata({ ...metadata, price_per_liter: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+              </div>
+            )}
+
+            {category === 'restaurant' && (
+              <>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Mekan Adı</label>
+                  <input type="text" placeholder="Örn: Balıkçı Hasan" value={metadata.venue_name || ''} onChange={e => setMetadata({ ...metadata, venue_name: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <label className="block text-xs text-slate-500 mb-1">Bahşiş Tutarı (₺)</label>
+                    <input type="number" placeholder="0.00" value={metadata.tip_amount || ''} onChange={e => setMetadata({ ...metadata, tip_amount: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                  </div>
+                  <div className="flex-1 flex items-center gap-2 mt-5">
+                    <input type="checkbox" id="tipInc" checked={metadata.tip_included_in_split || false} onChange={e => setMetadata({ ...metadata, tip_included_in_split: e.target.checked })} className="rounded text-primary" />
+                    <label htmlFor="tipInc" className="text-xs text-slate-600 dark:text-slate-400 cursor-pointer">Bölüşüme dahil mi?</label>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {category === 'accommodation' && (
+              <div className="flex gap-3">
+                <div className="flex-2">
+                  <label className="block text-xs text-slate-500 mb-1">Tesis / Otel Adı</label>
+                  <input type="text" placeholder="Örn: Hilton" value={metadata.venue_name || ''} onChange={e => setMetadata({ ...metadata, venue_name: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Gece Sayısı</label>
+                  <input type="number" placeholder="Örn: 3" value={metadata.nights || ''} onChange={e => setMetadata({ ...metadata, nights: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+              </div>
+            )}
+
+            {category === 'transport' && (
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Nereden</label>
+                  <input type="text" placeholder="Örn: Havalimanı" value={metadata.from || ''} onChange={e => setMetadata({ ...metadata, from: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-xs text-slate-500 mb-1">Nereye</label>
+                  <input type="text" placeholder="Örn: Otel" value={metadata.to || ''} onChange={e => setMetadata({ ...metadata, to: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+                </div>
+              </div>
+            )}
+
+            {category === 'shopping' && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Market / Mağaza Adı</label>
+                <input type="text" placeholder="Örn: Migros" value={metadata.store_name || ''} onChange={e => setMetadata({ ...metadata, store_name: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+              </div>
+            )}
+
+            {category === 'entertainment' && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Etkinlik / Mekan Adı</label>
+                <input type="text" placeholder="Örn: Açık Hava Konseri" value={metadata.event_name || ''} onChange={e => setMetadata({ ...metadata, event_name: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+              </div>
+            )}
+
+            {category === 'health' && (
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Hastane / Eczane Adı</label>
+                <input type="text" placeholder="Örn: Nöbetçi Eczane" value={metadata.store_name || ''} onChange={e => setMetadata({ ...metadata, store_name: e.target.value })} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-sm" />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Bölüşüm Türü (Split Mode) */}
         <div>
@@ -224,7 +335,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
                 <button
                   key={mode}
                   onClick={() => setSplitMode(mode)}
-                  className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${isSelected ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                  className={`cursor-pointer flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${isSelected ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                   {labels[mode]}
                 </button>
@@ -233,7 +344,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
           </div>
         </div>
 
-        {/* Kim Ödedi? (Single Select Chips) */}
+        {/* Kim Ödedi? */}
         <div>
           <label className="block text-xs font-semibold text-slate-500 mb-2">Parayı Kim Verdi? <span className="font-normal text-slate-400">(Kasadan ödeyen)</span></label>
           <div className="flex overflow-x-auto gap-2 pb-2 custom-scrollbar snap-x">
@@ -243,7 +354,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
                 <button
                   key={m.id}
                   onClick={() => setPaidBy(m.id)}
-                  className={`snap-start shrink-0 flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border text-sm font-semibold transition-all duration-300 ${isSelected
+                  className={`cursor-pointer snap-start shrink-0 flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border text-sm font-semibold transition-all duration-300 ${isSelected
                     ? 'bg-slate-900 dark:bg-white border-slate-900 dark:border-white text-white dark:text-slate-900 shadow-md shadow-slate-900/20'
                     : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                     }`}
@@ -258,7 +369,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
           </div>
         </div>
 
-        {/* Kimler Arasında Bölüşülecek? (Multi Select Chips) */}
+        {/* Kimler Arasında Bölüşülecek? */}
         <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
           <div className="flex justify-between items-end mb-3">
             <label className="block text-xs font-semibold text-slate-500">
@@ -275,7 +386,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
                 <button
                   key={m.id}
                   onClick={() => toggleParticipant(m.id)}
-                  className={`flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-sm font-medium transition-all ${isSelected
+                  className={`cursor-pointer flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-sm font-medium transition-all ${isSelected
                     ? 'bg-primary-light/50 dark:bg-primary-dark/20 border-primary/30 text-primary-dark dark:text-primary-light'
                     : 'bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300'
                     }`}
@@ -289,7 +400,7 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
             })}
           </div>
 
-          {/* Dinamik Bölüşüm Girdileri (Eşit Değilse) */}
+          {/* Dinamik Bölüşüm Girdileri */}
           {splitMode !== 'equal' && selectedParticipants.length > 0 && (
             <div className="mt-4 space-y-2 bg-slate-50 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
               <div className="flex justify-between items-end mb-2">
@@ -351,3 +462,4 @@ export const AddShareModal = ({ isOpen, onClose, members, currentUserId, onAdd, 
     </Modal>
   );
 };
+

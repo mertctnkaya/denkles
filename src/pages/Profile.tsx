@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useToastStore } from '../store/toastStore';
@@ -5,19 +6,32 @@ import { useThemeStore } from '../store/themeStore';
 import { Icon } from '../components/shared/Icon';
 import type { IconName } from '../components/shared/Icon';
 import { Button } from '../components/shared/Button';
+import { Modal } from '../components/shared/Modal';
 
 export const Profile = () => {
   const navigate = useNavigate();
   const { profile, user, signOut } = useAuthStore();
   const { addToast } = useToastStore();
   const { isDarkMode, setTheme } = useThemeStore();
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const fullName = profile?.full_name || user?.user_metadata?.full_name || 'Kullanıcı';
   const initial = fullName.charAt(0).toUpperCase();
   const email = user?.email || 'e-posta bulunamadı';
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    if (user?.is_anonymous) {
+      
+      setIsLogoutModalOpen(true);
+    } else {
+      executeLogout();
+    }
+
+  };
+
+  const executeLogout = async () => {
     try {
+      setIsLogoutModalOpen(false);
       await signOut();
       addToast('Başarıyla çıkış yapıldı.', 'info');
     } catch (error) {
@@ -154,17 +168,52 @@ export const Profile = () => {
       </div>
 
       {/* Çıkış Yap Butonu */}
+      {user?.is_anonymous && (
+        <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-2xl p-4 mb-4 text-center">
+          <Icon name="warning" size={24} className="text-orange-500 mx-auto mb-2" />
+          <h3 className="font-bold text-orange-700 dark:text-orange-400 text-sm mb-1">Şu an Misafir Hesabındasınız!</h3>
+          <p className="text-xs text-orange-600 dark:text-orange-300">
+            Eğer çıkış yaparsanız bu hesaba bir daha giriş yapamazsınız. Tarayıcıyı kapattığınızda hesap kalır ama çıkış yaparsanız veya uygulamayı silerseniz geçmişteki tüm verilerinize erişiminiz sonsuza dek kaybolur. Hesabı kalıcı yapma özelliği çok yakında eklenecektir.
+          </p>
+        </div>
+      )}
+
       <Button
         variant="danger"
         size="lg"
         fullWidth
         icon="logout"
-        onClick={handleLogout}
+        onClick={handleLogoutClick}
         className="bg-transparent border-2 border-danger! hover:bg-danger text-danger hover:text-white mt-2"
       >
         Çıkış Yap
       </Button>
 
+      <Modal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        title="Kalıcı Veri Kaybı Riski"
+      >
+        <div className="space-y-4">
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 text-left">
+            <h3 className="font-bold text-orange-700 dark:text-orange-400 text-sm mb-1 flex items-center gap-2">
+              <Icon name="warning" size={16} /> Şu an Misafir Hesabındasınız!
+            </h3>
+            <p className="text-xs text-orange-600 dark:text-orange-300 leading-relaxed">
+              Çıkış yaparsanız bu hesaba ve geçmişteki tüm verilerinize (borçlar, alacaklar) bir daha <strong>asla</strong> ulaşamazsınız. Tarayıcıyı kapattığınızda sorun olmaz ama "Çıkış Yap" dediğiniz an hesap kalıcı olarak kilitlenir. Yine de çıkış yapmak istiyor musunuz?
+            </p>
+          </div>
+
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" fullWidth onClick={() => setIsLogoutModalOpen(false)}>
+              İptal
+            </Button>
+            <Button variant="primary" fullWidth onClick={executeLogout} className="bg-danger! hover:bg-danger/90! border-danger!">
+              Evet, Çıkış Yap
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

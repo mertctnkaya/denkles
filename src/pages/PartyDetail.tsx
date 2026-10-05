@@ -57,7 +57,7 @@ export const PartyDetail = () => {
   }, [id, shares, members, fetchEvents]);
 
   const { globalAction, clearGlobalAction } = useUiStore();
-  
+
   useEffect(() => {
     if (globalAction === 'new_share') {
       setIsAddShareModalOpen(true);
@@ -75,7 +75,8 @@ export const PartyDetail = () => {
     category: Share['category'],
     selectedParticipants: string[],
     splitMode: 'equal' | 'percentage' | 'exact' | 'shares',
-    customValues?: Record<string, number>
+    customValues?: Record<string, number>,
+    metadata?: Record<string, any>
   ) => {
     if (!id || !user) return false;
 
@@ -98,7 +99,8 @@ export const PartyDetail = () => {
       amount,
       { totalAmount: amount, splitMode, participants: selectedParticipants, customValues }, // splitInput
       paidByMemberId,
-      category
+      category,
+      metadata
     );
 
     if (success) {
@@ -210,7 +212,7 @@ export const PartyDetail = () => {
   };
 
   const isPositive = myNetBalance > 0;
-  const canManageMembers = myMember?.role === 'owner' || myMember?.role === 'admin';
+  // const canManageMembers = myMember?.role === 'owner' || myMember?.role === 'admin';
 
   return (
     <div className="flex flex-col h-full bg-slate-50 dark:bg-slate-950 pb-24 md:pb-6 relative min-h-screen md:min-h-[85vh] md:rounded-3xl md:border md:border-slate-200/50 dark:md:border-slate-800 md:shadow-lg overflow-hidden">
@@ -485,6 +487,8 @@ export const PartyDetail = () => {
                 if (event.event_type.includes('role_updated')) { eventIcon = 'shield'; eventColor = 'text-orange-500'; }
                 if (event.event_type.includes('share_deleted')) { eventIcon = 'trash'; eventColor = 'text-rose-500'; }
                 if (event.event_type.includes('archived')) { eventIcon = 'archive'; eventColor = 'text-amber-500'; }
+                if (event.event_type.includes('unarchived')) { eventIcon = 'refresh'; eventColor = 'text-emerald-500'; }
+                if (event.event_type.includes('share_created')) { eventIcon = 'receipt'; eventColor = 'text-primary'; }
 
                 // Text coloring logic
                 const renderDescription = (text: string) => {
@@ -510,9 +514,26 @@ export const PartyDetail = () => {
                   });
                 };
 
+                const isShareEvent = event.event_type.includes('share_created') && event.metadata?.share_id;
+
+                const handleEventClick = () => {
+                  if (isShareEvent) {
+                    const share = (shares || []).find(s => s.id === event.metadata.share_id);
+                    if (share) {
+                      setViewShare(share);
+                    } else {
+                      addToast('Bu harcama silinmiş olabilir.', 'info');
+                    }
+                  }
+                };
+
                 return (
-                  <div key={`event-${event.id}`} className="relative flex items-start gap-4 ml-2 z-10 py-1">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-[3px] border-slate-50 dark:border-slate-950 ${eventBg} ${eventColor} mt-1`}>
+                  <div
+                    key={`event-${event.id}`}
+                    onClick={handleEventClick}
+                    className={`relative flex items-start gap-4 ml-2 z-10 py-1 ${isShareEvent ? 'cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-xl px-2 -mx-2 transition-colors' : ''}`}
+                  >
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-[3px] border-slate-50 dark:border-slate-950 ${eventBg} ${eventColor} mt-1 ${isShareEvent ? 'bg-white dark:bg-slate-900 shadow-sm' : ''}`}>
                       <Icon name={eventIcon as any} size={14} strokeWidth={3} />
                     </div>
                     <div className="flex-1 bg-transparent py-1.5">

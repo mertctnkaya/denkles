@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 
 interface ModalProps {
@@ -11,6 +12,12 @@ interface ModalProps {
 }
 
 export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'md' }: ModalProps) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // ESC tuşuyla kapatma
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -30,7 +37,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'md
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const maxWidthClasses = {
     sm: 'max-w-sm',
@@ -38,7 +45,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'md
     lg: 'max-w-lg'
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
       {/* Backdrop */}
       <div
@@ -72,6 +79,7 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'md
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

@@ -34,10 +34,12 @@ export const Home = () => {
     const pendingRef = localStorage.getItem('pending_join_ref');
     
     if (pendingCode) {
+      console.log('[Home.tsx] pendingCode bulundu, joinParty çağrılıyor:', pendingCode, pendingRef);
       localStorage.removeItem('pending_join_code');
       if (pendingRef) localStorage.removeItem('pending_join_ref');
       
       usePartyStore.getState().joinParty(pendingCode, pendingRef || undefined).then((result) => {
+        console.log('[Home.tsx] joinParty sonucu:', result);
         if (result) {
           if (result.alreadyJoined) {
             addToast('Zaten bu gruptasınız.', 'info');

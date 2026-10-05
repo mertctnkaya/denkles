@@ -22,15 +22,18 @@ export const JoinPage = () => {
   const hasAttemptedJoin = useRef(false);
 
   useEffect(() => {
-    // Oturum varsa direkt katıl ve yönlendir
+    console.log('[JoinPage] useEffect tetiklendi. Session:', !!session, 'code:', code, 'attempted:', hasAttemptedJoin.current);
     if (session && code && !hasAttemptedJoin.current) {
       hasAttemptedJoin.current = true;
+      console.log('[JoinPage] handleJoin çağrılıyor...');
       handleJoin(code, refId);
     }
   }, [session, code]);
 
   const handleJoin = async (joinCode: string, referrerId?: string) => {
+    console.log('[JoinPage] handleJoin başladı. joinCode:', joinCode);
     const result = await joinParty(joinCode, referrerId);
+    console.log('[JoinPage] handleJoin sonucu:', result);
     if (result) {
       if (result.alreadyJoined) {
         addToast('Zaten bu gruptasınız.', 'info');
@@ -51,20 +54,16 @@ export const JoinPage = () => {
     hasAttemptedJoin.current = true;
     setIsAnonymousLoading(true);
     try {
-      // 1. Supabase Anonymous SignIn
       const { error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
       
-      // 2. Misafir adını profile yaz
       await supabase.auth.updateUser({
         data: { full_name: guestName.trim() }
       });
       
-      // 3. Direkt katıl (useEffect'e bırakmak yerine burada çağır — çoklu toast'u önler)
-      // DİKKAT: Burada handleJoin çağırmıyoruz! Çünkü signInAnonymously sonrası
-      // oturum açıldığı için App.tsx bizi yeni bir (authenticated) JoinPage'e yönlendiriyor.
-      // O yeni JoinPage'in useEffect'i zaten handleJoin'i çağıracak. 
-      // Eski unmounted componentten çağırmak router'ı ve navigate'i kilitliyor.
+      // auth session yenileneceği için useEffect devreye girecek.
+      // O useEffect'in handleJoin'i çağırabilmesi için blockeri kaldırıyoruz:
+      hasAttemptedJoin.current = false;
     } catch (err: any) {
       hasAttemptedJoin.current = false;
       addToast(err.message || 'Misafir girişi başarısız oldu.', 'error');
@@ -135,7 +134,7 @@ export const JoinPage = () => {
               fullWidth
               onClick={() => setShowGuestInput(true)}
             >
-              Misafir (Hayalet) Olarak Katıl
+              Hesap Açmadan (Misafir) Katıl
             </Button>
             
             <div className="relative py-2">

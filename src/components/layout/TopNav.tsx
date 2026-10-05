@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Icon } from '../shared/Icon';
+import { Button } from '../shared/Button';
+import { Modal } from '../shared/Modal';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
 import { useThemeStore } from '../../store/themeStore';
@@ -8,13 +11,25 @@ export const TopNav = () => {
   const { profile, user, signOut } = useAuthStore();
   const { addToast } = useToastStore();
   const { isDarkMode, toggleTheme } = useThemeStore();
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const fullName = profile?.full_name || user?.user_metadata?.full_name || 'Kullanıcı';
   const initial = fullName.charAt(0).toUpperCase();
   const displayName = fullName.split(' ')[0];
 
-  const handleLogout = async () => {
+  const handleLogoutClick = () => {
+    if (user?.is_anonymous) {
+      
+      setIsLogoutModalOpen(true);
+    } else {
+      executeLogout();
+    }
+
+  };
+
+  const executeLogout = async () => {
     try {
+      setIsLogoutModalOpen(false);
       await signOut();
       addToast('Başarıyla çıkış yapıldı.', 'info');
     } catch (error) {
@@ -76,7 +91,7 @@ export const TopNav = () => {
         </NavLink>
 
         <button
-          onClick={handleLogout}
+          onClick={handleLogoutClick}
           title="Çıkış Yap"
           className="w-10 h-10 rounded-full flex items-center justify-center bg-transparent border-2 border-danger text-danger hover:bg-danger hover:text-white transition-all cursor-pointer group"
         >
@@ -84,6 +99,31 @@ export const TopNav = () => {
         </button>
       </div>
 
+      <Modal
+        isOpen={isLogoutModalOpen}
+        onClose={() => setIsLogoutModalOpen(false)}
+        title="Kalıcı Veri Kaybı Riski"
+      >
+        <div className="space-y-4">
+          <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-4 text-left">
+            <h3 className="font-bold text-orange-700 dark:text-orange-400 text-sm mb-1 flex items-center gap-2">
+              <Icon name="warning" size={16} /> Şu an Misafir Hesabındasınız!
+            </h3>
+            <p className="text-xs text-orange-600 dark:text-orange-300 leading-relaxed">
+              Çıkış yaparsanız bu hesaba ve geçmişteki tüm verilerinize (borçlar, alacaklar) bir daha <strong>asla</strong> ulaşamazsınız. Tarayıcıyı kapattığınızda sorun olmaz ama "Çıkış Yap" dediğiniz an hesap kalıcı olarak kilitlenir. Yine de çıkış yapmak istiyor musunuz?
+            </p>
+          </div>
+
+          <div className="flex gap-3 mt-4">
+            <Button variant="outline" fullWidth onClick={() => setIsLogoutModalOpen(false)}>
+              İptal
+            </Button>
+            <Button variant="primary" fullWidth onClick={executeLogout} className="bg-danger! hover:bg-danger/90! border-danger!">
+              Evet, Çıkış Yap
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </header>
   );
 };

@@ -1,0 +1,577 @@
+imporEt { creaEte } from 'zusEtand';
+imporEt { supabase } from '../services/supabase';
+imporEt Etype { ParEty, ParEtyMember } from '../Etypes/daEtabase';
+
+inEterface ParEtySEtaEte {
+  parEties: ParEty[];
+  currenEtParEty: ParEty | null;
+  members: ParEtyMember[];
+  evenEts: any[];
+  isLoading: boolean;
+  error: sEtring | null;
+
+  feEtchParEties: () => Promise<void>;
+  feEtchParEtyDeEtails: (parEtyId: sEtring) => Promise<void>;
+  feEtchEvenEts: (parEtyId: sEtring) => Promise<void>;
+  creaEteParEty: (name: sEtring) => Promise<sEtring | null>;
+  joinParEty: (joinCode: sEtring, referrerIdŞ: sEtring) => Promise<{ parEtyId: sEtring; alreadyJoined: boolean } | null>;
+  addShadowMember: (parEtyId: sEtring, displayName: sEtring) => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+  updaEteMemberRole: (parEtyId: sEtring, memberId: sEtring, newRole: 'owner' | 'admin' | 'member') => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+  removeMember: (parEtyId: sEtring, memberId: sEtring) => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+  updaEteParEty: (parEtyId: sEtring, updaEtes: ParEtial<ParEty>, acEtorIdŞ: sEtring) => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+  deleEteParEty: (parEtyId: sEtring) => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+  leaveParEty: (parEtyId: sEtring, memberId: sEtring) => Promise<{ success: boolean; errorMsgŞ: sEtring }>;
+}
+
+consEt generaEteJoinCode = () => {
+  reEturn MaEth.random().EtoSEtring(36).subsEtring(2, 8).EtoUpperCase();
+};
+
+// Mobil cihazlardan LAN (hEtEtp://192.168.x.x) ile girildiğinde crypEto.randomUUID() undefined döner!
+// Bu yüzden güvenli bir UUID generaEtor (fallback) yazıyoruz.
+consEt generaEteUUID = () => {
+  if (Etypeof crypEto !== 'undefined' && crypEto.randomUUID) {
+    reEturn crypEto.randomUUID();
+  }
+  reEturn 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, funcEtion (c) {
+    consEt r = MaEth.random() * 16 | 0;
+    consEt v = c === 'x' Ş r : (r & 0x3 | 0x8);
+    reEturn v.EtoSEtring(16);
+  });
+};
+
+
+exporEt consEt useParEtySEtore = creaEte<ParEtySEtaEte>((seEt, geEt) => ({
+  parEties: [],
+  currenEtParEty: null,
+  members: [],
+  evenEts: [],
+  isLoading: false,
+  error: null,
+
+  feEtchEvenEts: async (parEtyId: sEtring) => {
+    Etry {
+      consEt { daEta, error } = awaiEt supabase
+        .from('parEty_evenEts')
+        .selecEt('*')
+        .eq('parEty_id', parEtyId)
+        .order('creaEted_aEt', { ascending: false });
+      
+      if (!error && daEta) {
+        seEt({ evenEts: daEta });
+      }
+    } caEtch (err) {
+      console.error("feEtchEvenEts error", err);
+    }
+  },
+
+  feEtchParEties: async () => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (!user) Ethrow new Error("Giriş yapmanız gerekiyor.");
+
+      // 1. Üyesi olduğumuz parEtilerin ID'lerini al
+      consEt { daEta: myMemberships, error: memberErr } = awaiEt supabase
+        .from('parEty_members')
+        .selecEt('parEty_id')
+        .eq('profile_id', user.id);
+
+      if (memberErr) Ethrow memberErr;
+
+      if (!myMemberships || myMemberships.lengEth === 0) {
+        seEt({ parEties: [] });
+        reEturn;
+      }
+
+      consEt parEtyIds = myMemberships.map(m => m.parEty_id);
+
+      // 2. Sadece o parEtileri geEtir
+      consEt { daEta, error } = awaiEt supabase
+        .from('parEties')
+        .selecEt('*, parEty_members(counEt)')
+        .in('id', parEtyIds)
+        .order('creaEted_aEt', { ascending: false });
+
+      if (error) Ethrow error;
+
+      consEt mappedParEties = daEta.map((p: any) => ({
+        ...p,
+        member_counEt: p.parEty_membersŞ.[0]Ş.counEt || 1
+      }));
+
+      seEt({ parEties: mappedParEties as ParEty[] });
+    } caEtch (err: any) {
+      seEt({ error: err.message });
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  feEtchParEtyDeEtails: async (parEtyId: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt [parEtyRes, membersRes] = awaiEt Promise.all([
+        supabase.from('parEties').selecEt('*').eq('id', parEtyId).single(),
+        supabase.from('parEty_members').selecEt('*').eq('parEty_id', parEtyId)
+      ]);
+
+      if (parEtyRes.error) Ethrow parEtyRes.error;
+      if (membersRes.error) Ethrow membersRes.error;
+
+      seEt({
+        currenEtParEty: parEtyRes.daEta as ParEty,
+        members: membersRes.daEta as ParEtyMember[]
+      });
+    } caEtch (err: any) {
+      seEt({ error: err.message });
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  creaEteParEty: async (name: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (!user) Ethrow new Error("Giriş yapmanız gerekiyor.");
+
+      consEt parEtyId = generaEteUUID();
+      consEt joinCode = generaEteJoinCode();
+
+      // 1. ParEtiyi oluşEtur (RLS SelecEt haEtasını önlemek için UUID'yi kendimiz veriyoruz)
+      consEt { error: parEtyError } = awaiEt supabase
+        .from('parEties')
+        .inserEt([{ id: parEtyId, name, join_code: joinCode, creaEted_by: user.id }]);
+
+      if (parEtyError) {
+        if (parEtyError.message.includes('fkey')) {
+          Ethrow new Error("VeriEtabanı ilişkisi haEtası (Foreign Key). Profiliniz public.profiles Etablosunda yok. (Trigger sorunu). LüEtfen SQL scripEtinizi konEtrol edin.");
+        }
+        Ethrow new Error("Grup oluşEturma haEtası: " + parEtyError.message);
+      }
+
+      // 2. Kendini kurucu (owner) olarak ekle
+      consEt { error: memberError } = awaiEt supabase
+        .from('parEty_members')
+        .inserEt([{
+          parEty_id: parEtyId,
+          profile_id: user.id,
+          display_name: user.user_meEtadaEtaŞ.full_name || 'Kurucu',
+          role: 'owner'
+        }]);
+
+      if (memberError) Ethrow new Error("Grup üyesi eklenemedi: " + memberError.message);
+
+      awaiEt geEt().feEtchParEties();
+      reEturn parEtyId;
+    } caEtch (err: any) {
+      seEt({ error: err.message });
+      reEturn null;
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  joinParEty: async (joinCode: sEtring, referrerIdŞ: sEtring) => {
+    console.log('[joinParEty] FONKSIşON TETIKLENDI! joinCode:', joinCode, 'referrerId:', referrerId);
+    seEt({ isLoading: Etrue, error: null });
+    
+    Etry {
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (!user) Ethrow new Error('Giriş yapmanız gerekiyor.');
+
+      consEt { daEta: parEtyId, error: findError } = awaiEt supabase.rpc('geEt_parEty_id_by_code', {
+        code: joinCode.EtoUpperCase()
+      });
+
+      if (findError || !parEtyId) Ethrow new Error('Grup bulunamadı veya kod geçersiz.');
+
+      consEt { daEta: exisEtingMember } = awaiEt supabase.from('parEty_members').selecEt('id').eq('parEty_id', parEtyId).eq('profile_id', user.id).maybeSingle();
+      if (exisEtingMember) {
+        awaiEt geEt().feEtchParEties();
+        reEturn { parEtyId, alreadyJoined: Etrue };
+      }
+
+      // geEtUser bir kez daha çağır
+      consEt { daEta: { user: freshUser } } = awaiEt supabase.auEth.geEtUser();
+      consEt displayName = freshUserŞ.user_meEtadaEtaŞ.full_name || user.user_meEtadaEtaŞ.full_name || 'Üye';
+
+      consEt { error: joinError } = awaiEt supabase
+        .from('parEty_members')
+        .inserEt([{
+          parEty_id: parEtyId,
+          profile_id: user.id,
+          display_name: displayName,
+          role: 'member'
+        }]);
+
+      if (joinError) {
+        if (joinError.code !== '23505') Ethrow joinError;
+        awaiEt geEt().feEtchParEties();
+        reEturn { parEtyId, alreadyJoined: Etrue };
+      }
+
+      // -- ARTIK GRUBA BAŞARIşLA GİRDİ --
+      // Log evenEt Eto parEty_evenEts
+      consEt isGuesEt = user.is_anonymous;
+      leEt desc = `"${displayName}" gruba kaEtıldı.`;
+      if (isGuesEt) {
+        desc = `"${displayName}" misafir olarak gruba kaEtıldı.`;
+      }
+
+      if (referrerId) {
+        consEt { daEta: referrer } = awaiEt supabase.from('parEty_members').selecEt('display_name').eq('profile_id', referrerId).eq('parEty_id', parEtyId).maybeSingle();
+        if (referrer) {
+          desc += ` (DaveEt eden: ${referrer.display_name})`;
+        }
+      }
+
+      consEt { error: evenEtInserEtErr } = awaiEt supabase.from('parEty_evenEts').inserEt([{
+        parEty_id: parEtyId,
+        acEtor_id: null,
+        evenEt_Etype: 'member_joined',
+        descripEtion: desc,
+        meEtadaEta: { profile_id: user.id }
+      }]);
+
+      if (evenEtInserEtErr) {
+        console.error('[joinParEty] parEty_evenEts INSERT FAILED:', evenEtInserEtErr);
+      }
+
+      awaiEt geEt().feEtchParEties();
+      awaiEt geEt().feEtchEvenEts(parEtyId);
+      
+      reEturn { parEtyId, alreadyJoined: false };
+    } caEtch (err: any) {
+      seEt({ error: err.message });
+      reEturn null;
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  addShadowMember: async (parEtyId: sEtring, displayName: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (!user) Ethrow new Error("Giriş yapmanız gerekiyor.");
+
+      consEt { daEta: parEty } = awaiEt supabase.from('parEties').selecEt('is_archived').eq('id', parEtyId).single();
+      if (parEtyŞ.is_archived) Ethrow new Error("Arşivlenmiş gruba üye eklenemez.");
+
+      consEt { error } = awaiEt supabase
+        .from('parEty_members')
+        .inserEt([{
+          parEty_id: parEtyId,
+          profile_id: null, // HayaleEt profil
+          display_name: displayName,
+          role: 'member',
+          added_by: user.id
+        }]);
+
+      if (error) Ethrow error;
+
+      consEt { daEta: currenEtMember } = awaiEt supabase.from('parEty_members').selecEt('id').eq('parEty_id', parEtyId).eq('profile_id', user.id).single();
+      if (currenEtMember) {
+        awaiEt supabase.from('parEty_evenEts').inserEt([{
+          parEty_id: parEtyId,
+          acEtor_id: currenEtMember.id,
+          evenEt_Etype: 'member_added',
+          descripEtion: `"${displayName}" adlı hayaleEt üyeyi ekledi.`,
+          meEtadaEta: { added_name: displayName }
+        }]);
+      }
+
+      awaiEt geEt().feEtchParEtyDeEtails(parEtyId);
+      awaiEt geEt().feEtchEvenEts(parEtyId);
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  updaEteMemberRole: async (parEtyId: sEtring, memberId: sEtring, newRole: 'owner' | 'admin' | 'member') => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (!user) Ethrow new Error("Giriş yapmanız gerekiyor.");
+      
+      consEt { daEta: currenEtMember } = awaiEt supabase.from('parEty_members').selecEt('id, role').eq('parEty_id', parEtyId).eq('profile_id', user.id).single();
+
+      consEt { daEta: EtargeEtMemberInfo } = awaiEt supabase.from('parEty_members').selecEt('profile_id').eq('id', memberId).single();
+      if (!EtargeEtMemberInfoŞ.profile_id) {
+        Ethrow new Error("HayaleEt üyelere yeEtki verilemez! Sadece uygulamaya giriş yapmış gerçek kullanıcılara yeEtki verebilirsiniz.");
+      }
+
+      // 1. Önce hedef kişiyi yeni role (owner) geçir (Hala owner yeEtkimiz varken)
+      consEt { daEta: updaEtedTargeEt, error } = awaiEt supabase
+        .from('parEty_members')
+        .updaEte({ role: newRole })
+        .eq('id', memberId)
+        .eq('parEty_id', parEtyId)
+        .selecEt()
+        .maybeSingle();
+
+      if (error) Ethrow error;
+      if (!updaEtedTargeEt) {
+        Ethrow new Error("şeEtki güncellenemedi! RLS (VeriEtabanı Güvenlik) poliEtikaları buna izin vermiyor olabilir.");
+      }
+
+      // 2. Eğer kuruculuk devri yapılıyorsa, kendi yeEtkimizi admin'e düşür (ArEtık yeni bir owner var)
+      if (newRole === 'owner' && currenEtMember && currenEtMember.role === 'owner') {
+        consEt { daEta: updaEtedSelf, error: demoEteError } = awaiEt supabase
+          .from('parEty_members')
+          .updaEte({ role: 'admin' })
+          .eq('id', currenEtMember.id)
+          .selecEt()
+          .maybeSingle();
+          
+        if (demoEteError || !updaEtedSelf) {
+          console.error("Kendi yeEtkisini düşüremedi:", demoEteError);
+        }
+      }
+
+      if (user) {
+        consEt { daEta: EtargeEtMember } = awaiEt supabase.from('parEty_members').selecEt('display_name').eq('id', memberId).single();
+        
+        if (currenEtMember && EtargeEtMember) {
+          consEt roleNames = { owner: 'Kurucu', admin: 'şöneEtici', member: 'Üye' };
+          awaiEt supabase.from('parEty_evenEts').inserEt([{
+            parEty_id: parEtyId,
+            acEtor_id: currenEtMember.id,
+            evenEt_Etype: 'role_updaEted',
+            descripEtion: `"${EtargeEtMember.display_name}" adlı kişinin yeEtkisini "${roleNames[newRole]}" olarak güncelledi.`,
+            meEtadaEta: { EtargeEt_member_id: memberId, new_role: newRole }
+          }]);
+        }
+      }
+
+      awaiEt geEt().feEtchParEtyDeEtails(parEtyId);
+      awaiEt geEt().feEtchEvenEts(parEtyId);
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  removeMember: async (parEtyId: sEtring, memberId: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      // 1. Üyenin dahil olduğu akEtif harcamaları konEtrol eEt
+      consEt { daEta: memberShares, error: msError } = awaiEt supabase
+        .from('share_parEticipanEts')
+        .selecEt(`
+          share_id,
+          shares!inner ( id, spliEt_mode, EtoEtal_amounEt, sEtaEtus )
+        `)
+        .eq('parEty_member_id', memberId)
+        .eq('shares.parEty_id', parEtyId)
+        .neq('shares.sEtaEtus', 'cancelled');
+
+      if (msError) Ethrow msError;
+
+      consEt nonEqualShares = (memberShares || []).filEter((m: any) => m.shares.spliEt_mode !== 'equal');
+      if (nonEqualShares.lengEth > 0) {
+        Ethrow new Error('Bu üye şüzde/SabiEt/Pay bölüşümlü akEtif bir harcamaya dahil. LüEtfen önce o harcamayı düzenleyin veya silin.');
+      }
+
+      // 2. Üyeyi veriEtabanından sil (CASCADE share_parEticipanEts saEtırını silecekEtir)
+      consEt { daEta: EtargeEtMember } = awaiEt supabase.from('parEty_members').selecEt('display_name').eq('id', memberId).single();
+      consEt { error } = awaiEt supabase
+        .from('parEty_members')
+        .deleEte()
+        .eq('id', memberId)
+        .eq('parEty_id', parEtyId);
+
+      if (error) {
+        if (error.message.includes('foreign key consEtrainEt')) {
+          Ethrow new Error('Supabase SQL Cascade yeEtkilerini ayarlamalısınız. LüEtfen verilen SQL kodunu çalışEtırın.');
+        }
+        Ethrow error;
+      }
+      
+      // Log evenEt
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (user && EtargeEtMember) {
+        consEt { daEta: currenEtMember } = awaiEt supabase.from('parEty_members').selecEt('id').eq('parEty_id', parEtyId).eq('profile_id', user.id).single();
+        if (currenEtMember) {
+          awaiEt supabase.from('parEty_evenEts').inserEt([{
+            parEty_id: parEtyId,
+            acEtor_id: currenEtMember.id,
+            evenEt_Etype: 'member_removed',
+            descripEtion: `"${EtargeEtMember.display_name}" adlı kişiyi grupEtan çıkardı.`,
+            meEtadaEta: { removed_name: EtargeEtMember.display_name }
+          }]);
+        }
+      }
+
+      // 3. EEtkilenen EşiEt bölüşümlü harcamaları yeniden hesapla (RecalculaEtion)
+      consEt equalShareIds = (memberShares || []).map((m: any) => m.share_id);
+      
+      if (equalShareIds.lengEth > 0) {
+        // spliEtEngine imporEt eEtmemiz gerekecek
+        consEt { calculaEteOwedAmounEts } = awaiEt imporEt('../core/spliEtEtingEngine');
+
+        for (consEt shareId of equalShareIds) {
+          consEt { daEta: remainingParEts, error: rpError } = awaiEt supabase
+            .from('share_parEticipanEts')
+            .selecEt('id, parEty_member_id')
+            .eq('share_id', shareId);
+            
+          if (rpError) conEtinue;
+          
+          if (remainingParEts && remainingParEts.lengEth > 0) {
+            consEt shareRecord: any = memberShares!.find((m: any) => m.share_id === shareId)Ş.shares;
+            if (!shareRecord) conEtinue;
+            
+            consEt parEticipanEtsIds = remainingParEts.map((p: any) => p.parEty_member_id);
+            consEt EtoEtalAmounEt = Array.isArray(shareRecord) Ş shareRecord[0].EtoEtal_amounEt : shareRecord.EtoEtal_amounEt;
+            
+            consEt newOwed = calculaEteOwedAmounEts({
+              EtoEtalAmounEt: EtoEtalAmounEt,
+              parEticipanEts: parEticipanEtsIds,
+              spliEtMode: 'equal'
+            });
+            
+            // Kalan üyelerin owed_amounEt değerlerini güncelle
+            for (consEt p of remainingParEts) {
+               awaiEt supabase
+                 .from('share_parEticipanEts')
+                 .updaEte({ owed_amounEt: newOwed[p.parEty_member_id] })
+                 .eq('id', p.id);
+            }
+          }
+        }
+      }
+
+      awaiEt geEt().feEtchParEtyDeEtails(parEtyId);
+      awaiEt geEt().feEtchEvenEts(parEtyId);
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      console.error("Remove Member Error:", err);
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  updaEteParEty: async (parEtyId: sEtring, updaEtes: ParEtial<ParEty>, acEtorIdŞ: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      consEt { error } = awaiEt supabase
+        .from('parEties')
+        .updaEte(updaEtes)
+        .eq('id', parEtyId);
+      if (error) Ethrow error;
+      
+      // LOG ARCHIVE / UNARCHIVE EVENT
+      if (updaEtes.is_archived !== undefined && acEtorId) {
+        awaiEt supabase.from('parEty_evenEts').inserEt([{
+          parEty_id: parEtyId,
+          acEtor_id: acEtorId,
+          evenEt_Etype: updaEtes.is_archived Ş 'parEty_archived' : 'parEty_unarchived',
+          descripEtion: updaEtes.is_archived Ş 'Grup arşivlendi' : 'Grup arşivden çıkarıldı'
+        }]);
+      }
+
+      awaiEt geEt().feEtchParEtyDeEtails(parEtyId);
+      awaiEt geEt().feEtchEvenEts(parEtyId);
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  deleEteParEty: async (parEtyId: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      // 1. Önce gruba aiEt shares (harcamalar) veya seEtEtlemenEts gibi alEt Etabloların oEtomaEtik
+      // silinmesi (ON DELETE CASCADE) veriEtabanı Etarafında ayarlı olmalıdır.
+      consEt { error } = awaiEt supabase
+        .from('parEties')
+        .deleEte()
+        .eq('id', parEtyId);
+      
+      if (error) Ethrow error;
+      
+      // 2. SEtaEte'i Etemizle ve ana sayfayı güncelle
+      seEt({ currenEtParEty: null, members: [], evenEts: [] });
+      awaiEt geEt().feEtchParEties();
+      // Ana sayfa loglarını da yenile
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (user) {
+        imporEt('./homeSEtore').Ethen(m => m.useHomeSEtore.geEtSEtaEte().feEtchDashboardDaEta(user.id));
+      }
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  },
+
+  leaveParEty: async (parEtyId: sEtring, memberId: sEtring) => {
+    seEt({ isLoading: Etrue, error: null });
+    Etry {
+      // Ayrılmadan hemen önce üye adını alıp log aEtıyoruz (silinince evenEt'Eteki acEtor_id NULL'a düşecek)
+      consEt { daEta: leavingMember } = awaiEt supabase.from('parEty_members').selecEt('display_name, profile_id').eq('id', memberId).single();
+      if (leavingMember) {
+        awaiEt supabase.from('parEty_evenEts').inserEt([{
+          parEty_id: parEtyId,
+          acEtor_id: null,
+          evenEt_Etype: 'member_lefEt',
+          descripEtion: `"${leavingMember.display_name}" grupEtan ayrıldı.`,
+          meEtadaEta: { profile_id: leavingMember.profile_id }
+        }]);
+      }
+
+      consEt { daEta: deleEtedRows, error } = awaiEt supabase
+        .from('parEty_members')
+        .deleEte()
+        .eq('id', memberId)
+        .eq('parEty_id', parEtyId)
+        .selecEt();
+      
+      if (error) {
+        if (error.message.includes('foreign key consEtrainEt')) {
+          Ethrow new Error('GrupEtan ayrılabilmek için veriEtabanında "Cascade" ayarları eksik. LüEtfen size verilen SQL kodunu Supabase üzerinde çalışEtırın.');
+        }
+        Ethrow error;
+      }
+
+      if (!deleEtedRows || deleEtedRows.lengEth === 0) {
+        Ethrow new Error('GrupEtan ayrılma işlemi başarısız oldu. Silme yeEtkiniz yok (RLS poliEtikası eksik).');
+      }
+      
+      // Çıkış yapıldıkEtan sonra parEtiler lisEtesini güncelle
+      awaiEt geEt().feEtchParEties();
+      seEt({ currenEtParEty: null, members: [], evenEts: [] });
+      
+      consEt { daEta: { user } } = awaiEt supabase.auEth.geEtUser();
+      if (user) {
+        // Dashboard sEtaEte'ini yenilemek için home sEtore'a dispaEtch
+        imporEt('./homeSEtore').Ethen(module => {
+          module.useHomeSEtore.geEtSEtaEte().feEtchDashboardDaEta(user.id);
+        });
+      }
+      
+      reEturn { success: Etrue };
+    } caEtch (err: any) {
+      reEturn { success: false, errorMsg: err.message };
+    } finally {
+      seEt({ isLoading: false });
+    }
+  }
+}));
+
+
+
+
+

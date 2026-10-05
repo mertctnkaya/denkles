@@ -33,9 +33,15 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
   if (!share) return null;
 
   let catIcon: IconName = 'receipt';
-  if (share.category === 'fuel') catIcon = 'camera';
-  if (share.category === 'restaurant') catIcon = 'star';
-  if (share.category === 'shopping') catIcon = 'card';
+  let catColor = 'bg-slate-100 text-slate-500';
+  let catLabel = 'Genel';
+  if (share.category === 'fuel') { catIcon = 'car'; catColor = 'bg-orange-100 text-orange-600'; catLabel = 'Yakıt'; }
+  if (share.category === 'restaurant') { catIcon = 'star'; catColor = 'bg-red-100 text-red-600'; catLabel = 'Yemek'; }
+  if (share.category === 'shopping') { catIcon = 'card'; catColor = 'bg-blue-100 text-blue-600'; catLabel = 'Market'; }
+  if (share.category === 'accommodation') { catIcon = 'building'; catColor = 'bg-indigo-100 text-indigo-600'; catLabel = 'Konaklama'; }
+  if (share.category === 'transport') { catIcon = 'forward'; catColor = 'bg-teal-100 text-teal-600'; catLabel = 'Ulaşım'; }
+  if (share.category === 'entertainment') { catIcon = 'music'; catColor = 'bg-fuchsia-100 text-fuchsia-600'; catLabel = 'Eğlence'; }
+  if (share.category === 'health') { catIcon = 'health'; catColor = 'bg-rose-100 text-rose-600'; catLabel = 'Sağlık'; }
 
   const splitModeLabels = {
     equal: 'Eşit Bölüşüm',
@@ -43,6 +49,9 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
     shares: 'Pay ile Bölüşüm',
     exact: 'Tam Tutar ile Bölüşüm'
   };
+
+  const md = share.metadata || {};
+  const hasMetadata = Object.keys(md).length > 0;
 
   return (
     <Modal
@@ -53,12 +62,15 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
       <div className="space-y-6">
         {/* Başlık ve İkon */}
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${catColor}`}>
             <Icon name={catIcon} size={28} />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{share.title}</h3>
-            <p className="text-sm text-slate-500 font-medium mt-1">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">{catLabel}</span>
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white leading-tight">{share.title}</h3>
+            <p className="text-xs text-slate-500 font-medium mt-1">
               {new Date(share.created_at).toLocaleString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
@@ -66,6 +78,42 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
             <div className="text-2xl font-black text-slate-900 dark:text-white">₺{share.total_amount.toFixed(2)}</div>
           </div>
         </div>
+
+        {/* Dinamik Metadata Alanı */}
+        {hasMetadata && (
+          <div className="bg-slate-50/80 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-x-6 gap-y-3">
+            {md.liters && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Litre</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.liters} L</span></div>
+            )}
+            {md.price_per_liter && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Birim Fiyat</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">₺{md.price_per_liter}</span></div>
+            )}
+            {md.venue_name && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Mekan / Tesis</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.venue_name}</span></div>
+            )}
+            {md.tip_amount && (
+              <div>
+                <span className="block text-[10px] uppercase font-bold text-slate-400">Bahşiş</span>
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">₺{md.tip_amount} {md.tip_included_in_split ? '(Dahil)' : '(Hariç)'}</span>
+              </div>
+            )}
+            {md.nights && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Gece Sayısı</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.nights} Gece</span></div>
+            )}
+            {md.from && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Nereden</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.from}</span></div>
+            )}
+            {md.to && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Nereye</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.to}</span></div>
+            )}
+            {md.store_name && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Mağaza / Eczane</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.store_name}</span></div>
+            )}
+            {md.event_name && (
+              <div><span className="block text-[10px] uppercase font-bold text-slate-400">Etkinlik</span><span className="text-sm font-semibold text-slate-700 dark:text-slate-300">{md.event_name}</span></div>
+            )}
+          </div>
+        )}
 
         {/* Kim Ödedi ve Nasıl Bölüşüldü */}
         <div className="flex gap-3">
@@ -75,7 +123,7 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
               <div className="w-6 h-6 rounded-full bg-primary-light text-primary-dark flex items-center justify-center text-xs font-bold uppercase">
                 {payerMember?.display_name.charAt(0) || '?'}
               </div>
-              <span className="font-bold text-slate-700 dark:text-slate-200 text-sm">
+              <span className="font-bold text-slate-700 dark:text-slate-200 text-sm truncate max-w-25">
                 {payerMember?.profile_id === currentUserId ? 'Sen' : payerMember?.display_name || 'Bilinmiyor'}
               </span>
             </div>
@@ -93,7 +141,7 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Ortaklar ({shareParticipants.filter(p => members.some(m => m.id === p.party_member_id)).length})</h4>
           </div>
-          
+
           {(() => {
             const validParticipants = shareParticipants.filter(p => members.some(m => m.id === p.party_member_id));
             const validTotalOwed = validParticipants.reduce((sum, p) => sum + Number(p.owed_amount), 0);
@@ -107,8 +155,8 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
                     Bazı üyeler gruptan çıkarıldığı için aktif ortakların payları toplamı (₺{validTotalOwed.toFixed(2)}), harcamanın asıl tutarı (₺{share.total_amount.toFixed(2)}) ile uyuşmuyor. Lütfen harcamayı düzenleyin veya yeniden hesaplayın.
                   </div>
                 )}
-                
-                <div className="space-y-2">
+
+                <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
                   {validParticipants.map(part => {
                     const member = members.find(m => m.id === part.party_member_id)!;
                     const isMe = member.profile_id === currentUserId;
@@ -142,7 +190,7 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
           })()}
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex gap-3 pt-2 border-t border-slate-100 dark:border-slate-800/50">
           {!isArchived && (payerMember?.profile_id === currentUserId || members.find(m => m.profile_id === currentUserId)?.role === 'owner' || members.find(m => m.profile_id === currentUserId)?.role === 'admin' || share.created_by === members.find(m => m.profile_id === currentUserId)?.id) && (
             <Button variant="outline" fullWidth onClick={() => onEdit?.()}>
               Düzenle
@@ -154,3 +202,4 @@ export const ViewShareModal = ({ isOpen, onClose, share, participants, members, 
     </Modal>
   );
 };
+

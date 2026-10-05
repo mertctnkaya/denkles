@@ -3,6 +3,7 @@ import type { Party, PartyMember } from '../../types/database';
 import { usePartyStore } from '../../store/partyStore';
 import { useAuthStore } from '../../store/authStore';
 import { useToastStore } from '../../store/toastStore';
+import { supabase } from '../../services/supabase';
 import { Icon } from '../shared/Icon';
 import { Modal } from '../shared/Modal';
 import { Button } from '../shared/Button';
@@ -22,6 +23,24 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
   const { fetchShares } = useShareStore();
   const { addToast } = useToastStore();
   const { globalAction, clearGlobalAction } = useUiStore();
+
+  const [guestMembers, setGuestMembers] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const fetchGuestStatuses = async () => {
+      if (!members) return;
+      const guests = new Set<string>();
+      
+      for (const m of members) {
+        if (m.profile_id) {
+           const { data: isAnon } = await supabase.rpc('is_user_anonymous', { target_user_id: m.profile_id });
+           if (isAnon) guests.add(m.id);
+        }
+      }
+      setGuestMembers(guests);
+    };
+    fetchGuestStatuses();
+  }, [members]);
 
   const [isAddGhostModalOpen, setIsAddGhostModalOpen] = useState(false);
   
@@ -65,11 +84,31 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
 
   const handleRoleChange = async (memberId: string, newRole: 'owner' | 'admin' | 'member') => {
     if (!canManageRoles) return;
-    const result = await updateMemberRole(party.id, memberId, newRole);
-    if (result.success) {
-      addToast('Rol güncellendi.', 'success');
-    } else {
-      addToast(result.errorMsg || 'Rol güncellenirken hata oluştu.', 'error');
+    
+    try {
+      // Yükseltme yapılıyorsa (admin) misafir kontrolü yap
+      if (newRole === 'admin') {
+        const targetMember = members?.find(m => m.id === memberId);
+        if (targetMember?.profile_id) {
+          const { data: isAnon, error } = await supabase.rpc('is_user_anonymous', { target_user_id: targetMember.profile_id });
+          if (error) {
+            console.error("RPC Error:", error);
+          } else if (isAnon) {
+            addToast('Misafir hesaplara yönetici yetkisi verilemez. Lütfen hesabını kalıcı yapmasını isteyin.', 'warning');
+            return;
+          }
+        }
+      }
+
+      const result = await updateMemberRole(party.id, memberId, newRole);
+      if (result.success) {
+        addToast('Rol güncellendi.', 'success');
+      } else {
+        addToast(result.errorMsg || 'Rol güncellenirken hata oluştu.', 'error');
+      }
+    } catch (err) {
+      console.error("Role Change Error:", err);
+      addToast('Bir hata oluştu.', 'error');
     }
   };
 
@@ -78,9 +117,25 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
     setIsDeleteModalOpen(true);
   };
 
-  const openTransferModal = (memberId: string, name: string) => {
-    setMemberToTransfer({ id: memberId, name });
-    setIsTransferModalOpen(true);
+  const openTransferModal = async (memberId: string, name: string) => {
+    try {
+      const targetMember = members?.find(m => m.id === memberId);
+      if (targetMember?.profile_id) {
+        const { data: isAnon, error } = await supabase.rpc('is_user_anonymous', { target_user_id: targetMember.profile_id });
+        if (error) {
+          console.error("RPC Error:", error);
+          // Don't block if there's a network error, let it proceed or show a generic error
+        } else if (isAnon) {
+          addToast('Misafir hesaplara kuruculuk devredilemez. Lütfen hesabını kalıcı yapmasını isteyin.', 'warning');
+          return;
+        }
+      }
+      setMemberToTransfer({ id: memberId, name });
+      setIsTransferModalOpen(true);
+    } catch (err) {
+      console.error("Transfer Error:", err);
+      addToast('Bir hata oluştu.', 'error');
+    }
   };
 
   const confirmRemove = async () => {
@@ -143,9 +198,14 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
                   {isGhost && (
                     <span className="text-[9px] bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">
                       Hayalet
-                    </span>
-                  )}
-                </div>
+                      </span>
+                    )}
+                    {guestMembers.has(member.id) && (
+                      <span className='text-[9px] bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded uppercase font-bold tracking-wider'>
+                        MİSAFİR
+                      </span>
+                    )}
+                  </div>
                 <div className="flex items-center gap-1 mt-1">
                   {member.role === 'owner' && <span className="text-xs text-primary font-bold">Kurucu</span>}
                   {member.role === 'admin' && <span className="text-xs text-orange-500 font-bold">Yönetici</span>}
@@ -262,7 +322,8 @@ export const PartyMembersTab = ({ party, members }: PartyMembersTabProps) => {
             Grubun kuruculuğunu <span className="font-bold text-slate-900 dark:text-white">{memberToTransfer?.name}</span> adlı kişiye devretmek istediğinize emin misiniz? 
             Bu işlemi onaylarsanız <span className="font-bold text-rose-500">sizin yetkiniz "Yönetici" olarak düşürülecektir.</span>
           </p>
-          <div className="flex gap-3">
+
+          <div className="flex gap-3 mt-4">
             <Button variant="outline" fullWidth onClick={() => setIsTransferModalOpen(false)}>
               İptal
             </Button>
