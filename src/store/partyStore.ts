@@ -27,21 +27,6 @@ const generateJoinCode = () => {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 };
 
-// Mobil cihazlardan LAN (http://192.168.x.x) ile girildiğinde crypto.randomUUID() undefined döner!
-// Bu yüzden güvenli bir UUID generator (fallback) yazıyoruz.
-const generateUUID = () => {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-let activeJoinPromise: Promise<{ partyId: string; alreadyJoined: boolean } | null> | null = null;
-
 export const usePartyStore = create<PartyState>((set, get) => ({
   parties: [],
   currentParty: null,
@@ -50,33 +35,29 @@ export const usePartyStore = create<PartyState>((set, get) => ({
   isLoading: false,
   error: null,
 
-  fetchEvents: async (partyId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('party_events')
-        .select('*')
-        .eq('party_id', partyId)
-        .order('created_at', { ascending: false });
-      
-      if (!error && data) {
-        set({ events: data });
-      }
-    } catch (err) {
-      console.error("fetchEvents error", err);
-    }
-  },
-
   fetchParties: async () => {
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Giriş yapmanız gerekiyor.");
 
-      // Sadece üyesi olduğumuz partileri çek (RLS sayesinde supabase sadece bunları döner)
-      // Üye sayısını da party_members tablosundan count ile alıyoruz.
+      const { data: myMemberships, error: memberErr } = await supabase
+        .from('party_members')
+        .select('party_id')
+        .eq('profile_id', user.id);
+
+      if (memberErr) throw memberErr;
+
+      if (!myMemberships || myMemberships.length === 0) {
+        set({ parties: [], isLoading: false });
+        return;
+      }
+
+      const partyIds = myMemberships.map(m => m.party_id);
       const { data, error } = await supabase
         .from('parties')
         .select('*, party_members(count)')
+        .in('id', partyIds)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -86,33 +67,50 @@ export const usePartyStore = create<PartyState>((set, get) => ({
         member_count: p.party_members?.[0]?.count || 1
       }));
 
-      set({ parties: mappedParties as Party[] });
+      set({ parties: mappedParties, isLoading: false });
     } catch (err: any) {
-      set({ error: err.message });
-    } finally {
-      set({ isLoading: false });
+      console.error(err);
+      set({ error: err.message, isLoading: false });
     }
   },
 
   fetchPartyDetails: async (partyId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const [partyRes, membersRes] = await Promise.all([
-        supabase.from('parties').select('*').eq('id', partyId).single(),
-        supabase.from('party_members').select('*').eq('party_id', partyId)
-      ]);
+      const { data: partyData, error: partyError } = await supabase
+        .from('parties')
+        .select('*')
+        .eq('id', partyId)
+        .single();
+      if (partyError) throw partyError;
 
-      if (partyRes.error) throw partyRes.error;
-      if (membersRes.error) throw membersRes.error;
+      const { data: membersData, error: membersError } = await supabase
+        .from('party_members')
+        .select('*')
+        .eq('party_id', partyId)
+        .order('joined_at', { ascending: true });
+      if (membersError) throw membersError;
 
-      set({
-        currentParty: partyRes.data as Party,
-        members: membersRes.data as PartyMember[]
-      });
+      set({ currentParty: partyData, members: membersData || [], isLoading: false });
     } catch (err: any) {
-      set({ error: err.message });
-    } finally {
-      set({ isLoading: false });
+      console.error(err);
+      set({ error: err.message, isLoading: false });
+    }
+  },
+
+  fetchEvents: async (partyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('party_events')
+        .select('*')
+        .eq('party_id', partyId)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        set({ events: data });
+      }
+    } catch (err) {
+      console.error("fetchEvents error", err);
     }
   },
 
@@ -122,129 +120,102 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Giriş yapmanız gerekiyor.");
 
-      const partyId = generateUUID();
       const joinCode = generateJoinCode();
-
-      // 1. Partiyi oluştur (RLS Select hatasını önlemek için UUID'yi kendimiz veriyoruz)
-      const { error: partyError } = await supabase
+      const { data: party, error: partyError } = await supabase
         .from('parties')
-        .insert([{ id: partyId, name, join_code: joinCode, created_by: user.id }]);
+        .insert([{ name, join_code: joinCode, created_by: user.id }])
+        .select()
+        .single();
+      if (partyError) throw partyError;
 
-      if (partyError) {
-        if (partyError.message.includes('fkey')) {
-          throw new Error("Veritabanı ilişkisi hatası (Foreign Key). Profiliniz public.profiles tablosunda yok. (Trigger sorunu). Lütfen SQL scriptinizi kontrol edin.");
-        }
-        throw new Error("Grup oluşturma hatası: " + partyError.message);
-      }
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
 
-      // 2. Kendini kurucu (owner) olarak ekle
       const { error: memberError } = await supabase
         .from('party_members')
         .insert([{
-          party_id: partyId,
+          party_id: party.id,
           profile_id: user.id,
-          display_name: user.user_metadata?.full_name || 'Kurucu',
+          display_name: profile?.full_name || 'Kurucu',
           role: 'owner'
         }]);
+      if (memberError) throw memberError;
 
-      if (memberError) throw new Error("Grup üyesi eklenemedi: " + memberError.message);
+      await supabase.from('party_events').insert([{
+        party_id: party.id,
+        actor_id: null,
+        event_type: 'party_created',
+        description: `Grup oluşturuldu.`
+      }]);
 
       await get().fetchParties();
-      return partyId;
+      return party.id;
     } catch (err: any) {
-      set({ error: err.message });
+      set({ error: err.message, isLoading: false });
       return null;
-    } finally {
-      set({ isLoading: false });
     }
   },
 
   joinParty: async (joinCode: string, referrerId?: string) => {
-    if (activeJoinPromise) {
-      return activeJoinPromise;
-    }
-
     set({ isLoading: true, error: null });
-    
-    activeJoinPromise = (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Giriş yapmanız gerekiyor.');
-
-        const { data: partyId, error: findError } = await supabase.rpc('get_party_id_by_code', {
-          code: joinCode.toUpperCase()
-        });
-
-        if (findError || !partyId) throw new Error('Grup bulunamadı veya kod geçersiz.');
-
-        const { data: existingMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).maybeSingle();
-        if (existingMember) {
-          await get().fetchParties();
-          return { partyId, alreadyJoined: true };
-        }
-
-        // getUser bir kez daha çağır — misafir adını updateUser ile yeni yazmış olabilir,
-        // stale metadata'dan "Üye" yazmasını engelle
-        const { data: { user: freshUser } } = await supabase.auth.getUser();
-        const displayName = freshUser?.user_metadata?.full_name || user.user_metadata?.full_name || 'Üye';
-
-        const { error: joinError } = await supabase
-          .from('party_members')
-          .insert([{
-            party_id: partyId,
-            profile_id: user.id,
-            display_name: displayName,
-            role: 'member'
-          }]);
-
-        if (joinError) {
-          if (joinError.code !== '23505') throw joinError;
-          await get().fetchParties();
-          return { partyId, alreadyJoined: true };
-        } else {
-          // Because React 18 strict mode might have bypassed the client check due to concurrency,
-          // And we don't have a UNIQUE constraint on profile_id+party_id,
-          // Let's use `.order('created_at').limit(1).single()` just to be safe.
-          const { data: newMember } = await supabase.from('party_members').select('id, display_name').eq('party_id', partyId).eq('profile_id', user.id).order('created_at', { ascending: false }).limit(1).single();
-          if (newMember) {
-            const isGuest = user.is_anonymous;
-            let desc = `"${newMember.display_name}" gruba katıldı.`;
-            if (isGuest) {
-              desc = `"${newMember.display_name}" Misafir (Hayalet) olarak gruba katıldı.`;
-            }
-
-            if (referrerId) {
-              const { data: referrer } = await supabase.from('party_members').select('display_name').eq('profile_id', referrerId).eq('party_id', partyId).maybeSingle();
-              if (referrer) {
-                desc += ` (Davet eden: ${referrer.display_name})`;
-              }
-            }
-
-            await supabase.from('party_events').insert([{
-              party_id: partyId,
-              actor_id: null, // cascade silinmeyi önlemek için null yapıyoruz
-              event_type: 'member_joined',
-              description: desc,
-              metadata: { profile_id: user.id }
-            }]);
-          }
-        }
-
-        await get().fetchParties();
-        await get().fetchEvents(partyId); // geçmişe anında düşmesi için
-        return { partyId, alreadyJoined: false };
-      } catch (err: any) {
-        set({ error: err.message });
-        return null;
-      } finally {
-        set({ isLoading: false });
-      }
-    })();
-
     try {
-      return await activeJoinPromise;
-    } finally {
-      activeJoinPromise = null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Giriş yapmanız gerekiyor.");
+
+      const { data: party, error: partyError } = await supabase
+        .from('parties')
+        .select('id')
+        .eq('join_code', joinCode.toUpperCase())
+        .single();
+
+      if (partyError || !party) throw new Error("Grup bulunamadı. Kodu kontrol edin.");
+
+      const { data: existingMember } = await supabase
+        .from('party_members')
+        .select('id')
+        .eq('party_id', party.id)
+        .eq('profile_id', user.id)
+        .single();
+
+      if (existingMember) {
+        set({ isLoading: false });
+        return { partyId: party.id, alreadyJoined: true };
+      }
+
+      const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
+
+      const { error: joinError } = await supabase
+        .from('party_members')
+        .insert([{
+          party_id: party.id,
+          profile_id: user.id,
+          display_name: profile?.full_name || 'Yeni Üye',
+          role: 'member',
+          added_by: referrerId || null
+        }]);
+
+      if (joinError) throw joinError;
+
+      const { data: newMember } = await supabase
+        .from('party_members')
+        .select('id')
+        .eq('party_id', party.id)
+        .eq('profile_id', user.id)
+        .single();
+
+      if (newMember) {
+        await supabase.from('party_events').insert([{
+          party_id: party.id,
+          actor_id: newMember.id,
+          event_type: 'member_joined',
+          description: `Gruba katıldı.`
+        }]);
+      }
+
+      await get().fetchParties();
+      return { partyId: party.id, alreadyJoined: false };
+    } catch (err: any) {
+      set({ error: err.message, isLoading: false });
+      return null;
     }
   },
 
@@ -252,30 +223,36 @@ export const usePartyStore = create<PartyState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Giriş yapmanız gerekiyor.");
+      if (!user) throw new Error("Oturum bulunamadı");
 
-      const { data: party } = await supabase.from('parties').select('is_archived').eq('id', partyId).single();
-      if (party?.is_archived) throw new Error("Arşivlenmiş gruba üye eklenemez.");
+      const { data: existing } = await supabase
+        .from('party_members')
+        .select('id')
+        .eq('party_id', partyId)
+        .eq('display_name', displayName)
+        .single();
+
+      if (existing) throw new Error("Bu isimde bir üye zaten var");
 
       const { error } = await supabase
         .from('party_members')
         .insert([{
           party_id: partyId,
-          profile_id: null, // Hayalet profil
+          profile_id: null,
           display_name: displayName,
           role: 'member',
           added_by: user.id
         }]);
-
       if (error) throw error;
 
-      const { data: currentMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).single();
-      if (currentMember) {
+      const { data: currMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).single();
+
+      if (currMember) {
         await supabase.from('party_events').insert([{
           party_id: partyId,
-          actor_id: currentMember.id,
+          actor_id: currMember.id,
           event_type: 'member_added',
-          description: `"${displayName}" adlı hayalet üyeyi ekledi.`,
+          description: `"${displayName}" adlı misafir üyeyi ekledi.`,
           metadata: { added_name: displayName }
         }]);
       }
@@ -284,72 +261,35 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       await get().fetchEvents(partyId);
       return { success: true };
     } catch (err: any) {
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   },
 
   updateMemberRole: async (partyId: string, memberId: string, newRole: 'owner' | 'admin' | 'member') => {
     set({ isLoading: true, error: null });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Giriş yapmanız gerekiyor.");
-      
-      const { data: currentMember } = await supabase.from('party_members').select('id, role').eq('party_id', partyId).eq('profile_id', user.id).single();
-
-      // 1. Önce hedef kişiyi yeni role (owner) geçir (Hala owner yetkimiz varken)
       const { error } = await supabase
         .from('party_members')
         .update({ role: newRole })
         .eq('id', memberId)
-        .eq('party_id', partyId); // extra safety
-
+        .eq('party_id', partyId);
       if (error) throw error;
-
-      // 2. Eğer kuruculuk devri yapılıyorsa, kendi yetkimizi admin'e düşür (Artık yeni bir owner var)
-      if (newRole === 'owner' && currentMember && currentMember.role === 'owner') {
-        await supabase
-          .from('party_members')
-          .update({ role: 'admin' })
-          .eq('id', currentMember.id);
-      }
-
-      if (user) {
-        const { data: targetMember } = await supabase.from('party_members').select('display_name').eq('id', memberId).single();
-        
-        if (currentMember && targetMember) {
-          const roleNames = { owner: 'Kurucu', admin: 'Yönetici', member: 'Üye' };
-          await supabase.from('party_events').insert([{
-            party_id: partyId,
-            actor_id: currentMember.id,
-            event_type: 'role_updated',
-            description: `"${targetMember.display_name}" adlı kişinin yetkisini "${roleNames[newRole]}" olarak güncelledi.`,
-            metadata: { target_member_id: memberId, new_role: newRole }
-          }]);
-        }
-      }
-
       await get().fetchPartyDetails(partyId);
-      await get().fetchEvents(partyId);
       return { success: true };
     } catch (err: any) {
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   },
 
   removeMember: async (partyId: string, memberId: string) => {
     set({ isLoading: true, error: null });
     try {
-      // 1. Üyenin dahil olduğu aktif harcamaları kontrol et
+      // 1. Önce üyenin aktif harcamaları var mı kontrol et
       const { data: memberShares, error: msError } = await supabase
         .from('share_participants')
-        .select(`
-          share_id,
-          shares!inner ( id, split_mode, total_amount, status )
-        `)
+        .select(`shares!inner ( id, split_mode, total_amount, status )`)
         .eq('party_member_id', memberId)
         .eq('shares.party_id', partyId)
         .neq('shares.status', 'cancelled');
@@ -358,75 +298,31 @@ export const usePartyStore = create<PartyState>((set, get) => ({
 
       const nonEqualShares = (memberShares || []).filter((m: any) => m.shares.split_mode !== 'equal');
       if (nonEqualShares.length > 0) {
-        throw new Error('Bu üye Yüzde/Sabit/Pay bölüşümlü aktif bir harcamaya dahil. Lütfen önce o harcamayı düzenleyin veya silin.');
+        throw new Error('Bu üye yüzde/sabit/pay bölüşümlü bir harcamaya dahil. Önce harcamayı silin veya düzenleyin.');
       }
 
-      // 2. Üyeyi veritabanından sil (CASCADE share_participants satırını silecektir)
+      // 2. Üyeyi veritabanından sil
       const { data: targetMember } = await supabase.from('party_members').select('display_name').eq('id', memberId).single();
+
       const { error } = await supabase
         .from('party_members')
         .delete()
-        .eq('id', memberId)
-        .eq('party_id', partyId);
+        .eq('party_id', partyId)
+        .eq('id', memberId);
+      if (error) throw error;
 
-      if (error) {
-        if (error.message.includes('foreign key constraint')) {
-          throw new Error('Supabase SQL Cascade yetkilerini ayarlamalısınız. Lütfen verilen SQL kodunu çalıştırın.');
-        }
-        throw error;
-      }
-      
       // Log event
       const { data: { user } } = await supabase.auth.getUser();
       if (user && targetMember) {
-        const { data: currentMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).single();
-        if (currentMember) {
+        const { data: currMember } = await supabase.from('party_members').select('id').eq('party_id', partyId).eq('profile_id', user.id).single();
+        if (currMember) {
           await supabase.from('party_events').insert([{
             party_id: partyId,
-            actor_id: currentMember.id,
+            actor_id: currMember.id,
             event_type: 'member_removed',
-            description: `"${targetMember.display_name}" adlı kişiyi gruptan çıkardı.`,
+            description: `"${targetMember.display_name}" adlı kişiyi çıkardı.`,
             metadata: { removed_name: targetMember.display_name }
           }]);
-        }
-      }
-
-      // 3. Etkilenen Eşit bölüşümlü harcamaları yeniden hesapla (Recalculation)
-      const equalShareIds = (memberShares || []).map((m: any) => m.share_id);
-      
-      if (equalShareIds.length > 0) {
-        // splitEngine import etmemiz gerekecek
-        const { calculateOwedAmounts } = await import('../core/splittingEngine');
-
-        for (const shareId of equalShareIds) {
-          const { data: remainingParts, error: rpError } = await supabase
-            .from('share_participants')
-            .select('id, party_member_id')
-            .eq('share_id', shareId);
-            
-          if (rpError) continue;
-          
-          if (remainingParts && remainingParts.length > 0) {
-            const shareRecord: any = memberShares!.find((m: any) => m.share_id === shareId)?.shares;
-            if (!shareRecord) continue;
-            
-            const participantsIds = remainingParts.map((p: any) => p.party_member_id);
-            const totalAmount = Array.isArray(shareRecord) ? shareRecord[0].total_amount : shareRecord.total_amount;
-            
-            const newOwed = calculateOwedAmounts({
-              totalAmount: totalAmount,
-              participants: participantsIds,
-              splitMode: 'equal'
-            });
-            
-            // Kalan üyelerin owed_amount değerlerini güncelle
-            for (const p of remainingParts) {
-               await supabase
-                 .from('share_participants')
-                 .update({ owed_amount: newOwed[p.party_member_id] })
-                 .eq('id', p.id);
-            }
-          }
         }
       }
 
@@ -434,10 +330,8 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       await get().fetchEvents(partyId);
       return { success: true };
     } catch (err: any) {
-      console.error("Remove Member Error:", err);
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   },
 
@@ -449,8 +343,7 @@ export const usePartyStore = create<PartyState>((set, get) => ({
         .update(updates)
         .eq('id', partyId);
       if (error) throw error;
-      
-      // LOG ARCHIVE / UNARCHIVE EVENT
+
       if (updates.is_archived !== undefined && actorId) {
         await supabase.from('party_events').insert([{
           party_id: partyId,
@@ -464,44 +357,32 @@ export const usePartyStore = create<PartyState>((set, get) => ({
       await get().fetchEvents(partyId);
       return { success: true };
     } catch (err: any) {
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   },
 
   deleteParty: async (partyId: string) => {
     set({ isLoading: true, error: null });
     try {
-      // 1. Önce gruba ait shares (harcamalar) veya settlements gibi alt tabloların otomatik
-      // silinmesi (ON DELETE CASCADE) veritabanı tarafında ayarlı olmalıdır.
       const { error } = await supabase
         .from('parties')
         .delete()
         .eq('id', partyId);
-      
       if (error) throw error;
-      
-      // 2. State'i temizle ve ana sayfayı güncelle
+
       set({ currentParty: null, members: [], events: [] });
       await get().fetchParties();
-      // Ana sayfa loglarını da yenile
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        import('./homeStore').then(m => m.useHomeStore.getState().fetchDashboardData(user.id));
-      }
       return { success: true };
     } catch (err: any) {
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   },
 
   leaveParty: async (partyId: string, memberId: string) => {
     set({ isLoading: true, error: null });
     try {
-      // Ayrılmadan hemen önce üye adını alıp log atıyoruz (silinince event'teki actor_id NULL'a düşecek)
       const { data: leavingMember } = await supabase.from('party_members').select('display_name, profile_id').eq('id', memberId).single();
       if (leavingMember) {
         await supabase.from('party_events').insert([{
@@ -513,46 +394,20 @@ export const usePartyStore = create<PartyState>((set, get) => ({
         }]);
       }
 
-      const { data: deletedRows, error } = await supabase
+      const { error } = await supabase
         .from('party_members')
         .delete()
-        .eq('id', memberId)
         .eq('party_id', partyId)
-        .select();
-      
-      if (error) {
-        if (error.message.includes('foreign key constraint')) {
-          throw new Error('Gruptan ayrılabilmek için veritabanında "Cascade" ayarları eksik. Lütfen size verilen SQL kodunu Supabase üzerinde çalıştırın.');
-        }
-        throw error;
-      }
+        .eq('id', memberId);
 
-      if (!deletedRows || deletedRows.length === 0) {
-        throw new Error('Gruptan ayrılma işlemi başarısız oldu. Silme yetkiniz yok (RLS politikası eksik).');
-      }
-      
-      // Çıkış yapıldıktan sonra partiler listesini güncelle
+      if (error) throw error;
+
       await get().fetchParties();
       set({ currentParty: null, members: [], events: [] });
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        // Dashboard state'ini yenilemek için home store'a dispatch
-        import('./homeStore').then(module => {
-          module.useHomeStore.getState().fetchDashboardData(user.id);
-        });
-      }
-      
       return { success: true };
     } catch (err: any) {
-      return { success: false, errorMsg: err.message };
-    } finally {
       set({ isLoading: false });
+      return { success: false, errorMsg: err.message };
     }
   }
 }));
-
-
-
-
-

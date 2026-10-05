@@ -163,8 +163,8 @@ export const useShareStore = create<ShareState>((set, get) => ({
         party_id: partyId,
         actor_id: createdByMemberId,
         event_type: 'share_created',
-        description: `"${title}" harcamasını ekledi.`,
-        metadata: { share_id: share.id, amount: totalAmount }
+        description: `"${title}" harcamas�n� ekledi (${totalAmount.toFixed(2)} TL).`,
+        metadata: { share_id: share.id, amount: totalAmount, share_metadata: metadata }
       }]);
 
       // Verileri yenile
@@ -250,7 +250,7 @@ export const useShareStore = create<ShareState>((set, get) => ({
             party_id: partyId,
             actor_id: member.id,
             event_type: 'share_deleted',
-            description: `"${data[0].title}" harcamasını sildi.`,
+            description: `"${data[0].title}" harcamas�n� sildi.`,
             metadata: { share_id: shareId }
           }]);
         }

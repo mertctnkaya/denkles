@@ -28,13 +28,15 @@ export type PartyMember = {
 
 export type SplitMode = 'equal' | 'percentage' | 'exact' | 'shares';
 
+export type ShareCategory = 'general' | 'fuel' | 'shopping' | 'restaurant' | 'accommodation' | 'transport' | 'entertainment' | 'health';
+
 export type Share = {
   id: string;
   party_id: string;
   created_by: string;
   title: string;
   total_amount: number;
-  category: 'general' | 'fuel' | 'shopping' | 'restaurant';
+  category: ShareCategory;
   split_mode: SplitMode;
   status: 'active' | 'settled' | 'cancelled';
   metadata: Record<string, any> | null;
